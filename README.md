@@ -11,7 +11,7 @@ set of tools — but a ten-line Python script, or `curl`, can use it just as wel
 It was written to play measuring protocols that are too tedious, or too imprecise, to play by hand: one of
 them asks to park a rover on the same two spots again and again, before and after the game moves its
 world, and this mod parks it there to within a centimetre
-([Terrain Precision Fix Diag 2](https://github.com/lhervier/KSP-TerrainPrecisionFixDiag2/blob/master/docs/the-protocol-driving-runway.md)).
+([KSP Diag - Terrain Height](https://github.com/lhervier/KSP-Diag-TerrainHeight/blob/master/docs/the-protocol-driving-runway.md)).
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
@@ -72,8 +72,8 @@ curl -X POST http://127.0.0.1:8770/mcp/ -H "Content-Type: application/json" \
 
 `{"method":"tools/list"}` lists the tools with the schema of their arguments. A complete example, a
 Python script with no dependency that plays a whole protocol, is
-[`run-driving-runway.py`](https://github.com/lhervier/KSP-TerrainPrecisionFixDiag2/blob/master/diag/automation/run-driving-runway.py)
-in Terrain Precision Fix Diag 2.
+[`run-driving-runway.py`](https://github.com/lhervier/KSP-Diag-TerrainHeight/blob/master/diag/automation/run-driving-runway.py)
+in KSP Diag - Terrain Height.
 
 ## Adding tools from another mod
 
@@ -102,7 +102,7 @@ one at all can declare its own attribute class of that name, with `Name` and `De
 - What it returns is written as JSON: numbers, strings, booleans, lists, dictionaries, and the public
   fields of any other object. A `void` method answers `done`.
 
-Terrain Precision Fix Diag 2 and Diag 3 offer their Record and Clear buttons this way, the reading of
+KSP Diag - Terrain Height and Diag FloatingOrigin offer their Record and Clear buttons this way, the reading of
 their table, and the moving of their window.
 
 ## Build
