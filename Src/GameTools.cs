@@ -32,6 +32,30 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("folder", "string", "the game's folder under saves/", true),
                     Schema.P("save", "string", "the save's name, without .sfs", true)),
                 LoadSave);
+            yield return new Tool("open_game",
+                "Opens a game from any scene, the main menu included, as Resume Game does: in the scene it was " +
+                "saved in, the space centre for its persistent save. Waits until that scene is up.",
+                Schema.Object(
+                    Schema.P("folder", "string", "the game's folder under saves/", true),
+                    Schema.P("save", "string", "the save's name, without .sfs (default persistent)")),
+                OpenGame);
+            yield return new Tool("save_game",
+                "Saves the game as it is now, as a quicksave does, to saves/<folder>/<save>.sfs, overwriting it. " +
+                "Saved from flight, the save opens in flight.",
+                Schema.Object(
+                    Schema.P("save", "string", "the save's name, without .sfs", true),
+                    Schema.P("folder", "string", "the game's folder under saves/ (default: the game being played)")),
+                SaveGame);
+            yield return new Tool("launch_vessel",
+                "Launches a vessel from its .craft file at a launch site, as the editor's Launch button does, with " +
+                "the crew the editor would give it by default, and waits until physics runs on it. KSP saves the " +
+                "game as 'persistent' first, as it does for any launch. Needs a game loaded.",
+                Schema.Object(
+                    Schema.P("craft", "string",
+                        "the .craft file: absolute, or relative to the Ships folder of the game being played " +
+                        "(SPH/<name>.craft or VAB/<name>.craft)", true),
+                    Schema.P("site", "string", "the launch site's name (default Runway; LaunchPad for the pad)")),
+                LaunchVessel);
             yield return new Tool("screenshot",
                 "Captures the screen as it is drawn, user interface included. Returns the image, and saves it " +
                 "as a PNG when a path is given (relative to the KSP folder, or absolute).",
@@ -159,14 +183,148 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail("Could not load saves/" + folder + "/" + save + ".sfs");
                 yield break;
             }
+            Vessel previous = FlightGlobals.ActiveVessel;
             HighLogic.SaveFolder = folder;
             HighLogic.CurrentGame = game;
             FlightDriver.StartAndFocusVessel(game, game.flightState.activeVesselIdx);
+            yield return WaitForNewActiveVessel(call, previous);
+        }
 
-            // Until the flight scene is up and physics has the active vessel.
+        private static IEnumerator OpenGame(ToolCall call)
+        {
+            string folder = call.String("folder");
+            string save = call.String("save", "persistent");
+            string path = Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "saves"), folder), save + ".sfs");
+            ConfigNode root = File.Exists(path) ? ConfigNode.Load(path) : null;
+            ConfigNode node = root != null ? root.GetNode("GAME") : null;
+            Game game = node != null ? GamePersistence.LoadGameCfg(node, folder, true, false) : null;
+            if (game == null)
+            {
+                call.Fail("Could not open " + Path.GetFullPath(path));
+                yield break;
+            }
+
+            // What the main menu's Resume Game does, except saving the game back as persistent.
+            Vessel previous = FlightGlobals.ActiveVessel;
+            SceneWatch watch = new SceneWatch(game.startScene);
+            GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
+            GamePersistence.UpdateScenarioModules(game);
+            HighLogic.CurrentGame = game;
+            HighLogic.SaveFolder = folder;
+            GameEvents.onGameStatePostLoad.Fire(node);
+            game.Start();
+
+            if (game.startScene == GameScenes.FLIGHT)
+            {
+                GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+                yield return WaitForNewActiveVessel(call, previous);
+                yield break;
+            }
+
+            // Until the scene asked for has loaded: it may be the one being left, so the scene loaded now
+            // does not tell.
+            float start = Time.realtimeSinceStartup;
+            while (!watch.Loaded)
+            {
+                if (Time.realtimeSinceStartup - start > 180f)
+                {
+                    GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+                    call.Fail("The scene " + game.startScene + " was not up after 3 minutes");
+                    yield break;
+                }
+                yield return null;
+            }
+            GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+            call.Text(State());
+        }
+
+        /// <summary>Tells when a given scene has loaded. An instance, since an event refuses a static handler.</summary>
+        private sealed class SceneWatch
+        {
+            private readonly GameScenes _scene;
+
+            /// <summary>Whether the scene has loaded since the watch was made.</summary>
+            public bool Loaded;
+
+            public SceneWatch(GameScenes scene)
+            {
+                _scene = scene;
+            }
+
+            public void OnLoaded(GameScenes scene)
+            {
+                if (scene == _scene)
+                {
+                    Loaded = true;
+                }
+            }
+        }
+
+        private static IEnumerator SaveGame(ToolCall call)
+        {
+            if (HighLogic.CurrentGame == null)
+            {
+                call.Fail("No game loaded");
+                yield break;
+            }
+            string save = call.String("save");
+            string folder = call.String("folder", HighLogic.SaveFolder);
+
+            // What a quicksave does: the game brought up to date, set to open in the scene it was saved from.
+            Game game = HighLogic.CurrentGame.Updated();
+            if (HighLogic.LoadedSceneIsFlight)
+            {
+                game.startScene = GameScenes.FLIGHT;
+            }
+            GamePersistence.SaveGame(game, save, folder, SaveMode.OVERWRITE);
+            string path = Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "saves"), folder), save + ".sfs");
+            if (!File.Exists(path))
+            {
+                call.Fail("Could not save " + path);
+                yield break;
+            }
+            call.Text("Saved " + Path.GetFullPath(path));
+        }
+
+        private static IEnumerator LaunchVessel(ToolCall call)
+        {
+            if (HighLogic.CurrentGame == null)
+            {
+                call.Fail("No game loaded");
+                yield break;
+            }
+            string path = call.String("craft");
+            if (!Path.IsPathRooted(path))
+            {
+                path = Path.Combine(Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "saves"),
+                    HighLogic.SaveFolder), "Ships"), path);
+            }
+            path = Path.GetFullPath(path);
+            ConfigNode craft = File.Exists(path) ? ConfigNode.Load(path) : null;
+            if (craft == null)
+            {
+                call.Fail("Could not read the craft " + path);
+                yield break;
+            }
+
+            // The crew the editor proposes for that craft, without hiring anyone.
+            VesselCrewManifest crew = HighLogic.CurrentGame.CrewRoster.DefaultCrewForVessel(craft, null, false);
+            Vessel previous = FlightGlobals.ActiveVessel;
+            FlightDriver.StartWithNewLaunch(path, HighLogic.CurrentGame.flagURL, call.String("site", "Runway"), crew);
+            yield return WaitForNewActiveVessel(call, previous);
+        }
+
+        /// <summary>
+        /// Waits until a flight scene is up with an active vessel other than <paramref name="previous"/>, and
+        /// physics runs on it; then answers with the state of the game, or fails after three minutes.
+        /// </summary>
+        private static IEnumerator WaitForNewActiveVessel(ToolCall call, Vessel previous)
+        {
+            // The scene changes a few frames later: the vessel of the scene being left must not count. A
+            // vessel destroyed with its scene compares equal to null, and so differs from the new one.
             float start = Time.realtimeSinceStartup;
             while (!(HighLogic.LoadedSceneIsFlight && FlightGlobals.ready && FlightGlobals.ActiveVessel != null
-                     && !FlightGlobals.ActiveVessel.packed))
+                     && FlightGlobals.ActiveVessel != previous && !FlightGlobals.ActiveVessel.packed))
             {
                 if (Time.realtimeSinceStartup - start > 180f)
                 {

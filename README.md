@@ -28,7 +28,10 @@ when the rover is parked, `load_save` when the vessel is in flight and physics r
 |---|---|
 | `get_state` | the scene, the pause, the time, and the active vessel: situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
+| `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in |
 | `load_save` | loads a save into flight, from any scene |
+| `save_game` | saves the game as it is now under a name, as a quicksave does |
+| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does |
 | `screenshot` | captures the screen, interface included; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch |
 | `set_pause` | pauses or resumes the flight |
