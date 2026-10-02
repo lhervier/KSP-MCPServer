@@ -105,7 +105,10 @@ namespace com.github.lhervier.ksp.mcpserver
             {
                 { "scene", HighLogic.LoadedScene.ToString() },
                 { "paused", FlightDriver.Pause },
-                { "ut", Planetarium.GetUniversalTime() }
+                // Without a planetarium, the time is the game's, and there is no game while KSP loads or on
+                // the main menu.
+                { "ut", Planetarium.fetch != null || HighLogic.CurrentGame != null
+                    ? Planetarium.GetUniversalTime() : double.NaN }
             };
             Vessel v = HighLogic.LoadedSceneIsFlight ? FlightGlobals.ActiveVessel : null;
             if (v != null)
@@ -194,13 +197,12 @@ namespace com.github.lhervier.ksp.mcpserver
         {
             string folder = call.String("folder");
             string save = call.String("save", "persistent");
-            string path = Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "saves"), folder), save + ".sfs");
-            ConfigNode root = File.Exists(path) ? ConfigNode.Load(path) : null;
-            ConfigNode node = root != null ? root.GetNode("GAME") : null;
-            Game game = node != null ? GamePersistence.LoadGameCfg(node, folder, true, false) : null;
+            // Read as GamePersistence.LoadGame reads a save.
+            ConfigNode node = GamePersistence.LoadSFSFile(save, folder);
+            Game game = node != null ? GamePersistence.LoadGameCfg(node, save, true, false) : null;
             if (game == null)
             {
-                call.Fail("Could not open " + Path.GetFullPath(path));
+                call.Fail("Could not open saves/" + folder + "/" + save + ".sfs");
                 yield break;
             }
 
