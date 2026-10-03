@@ -40,7 +40,8 @@ when the rover is parked, `load_save` when the vessel is in flight and physics r
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
 | `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |
-| `set_position` | moves the active vessel above a point of a body, as *Set Position* of the `Alt+F12` menu does, and answers once it has settled on the ground |
+| `set_position` | moves the active vessel just above a point of a body, as *Set Position* of the `Alt+F12` menu does, pitch included, and answers once it has settled on the ground; refuses a point where another vessel lies |
+| `get_terrain` | the terrain of a body at a point: its height, whether the sea covers it, its slope and roughness |
 | `set_orbit` | puts the active vessel on an orbit, as *Set Orbit* of the `Alt+F12` menu does |
 | `revert_to_launch` | reverts the flight to its launch, as *Revert to Launch* does |
 | `go_to_scene` | leaves for the space centre or the tracking station, saving the game first as the game's own buttons do |

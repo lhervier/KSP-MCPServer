@@ -99,17 +99,30 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("infinite_fuel", "boolean", "Infinite Fuel")),
                 SetCheats);
             yield return new Tool("set_position",
-                "Moves the active vessel above a point of a body, as Set Position of the Alt+F12 menu does, and " +
+                "Moves the active vessel just above a point of a body, as Set Position of the Alt+F12 menu does, and " +
                 "lets it settle on the ground: answers once it is landed (or splashed) and still, or after the " +
                 "time limit.",
                 Schema.Object(
                     Schema.P("body", "string", "the body's name (default: the vessel's)"),
                     Schema.P("latitude", "number", "degrees", true),
                     Schema.P("longitude", "number", "degrees", true),
-                    Schema.P("altitude", "number", "metres above the terrain to drop from (default 2)"),
+                    Schema.P("altitude", "number", "metres of the vessel's root part above the terrain (default 1; more than the distance from the root part to the lowest point of the vessel)"),
+                    Schema.P("pitch", "number",
+                        "degrees, as the menu's pitch (default 0); 90 stands a craft built in the SPH, such as a " +
+                        "capsule on a tank, on its base"),
                     Schema.P("heading", "number", "degrees from north, towards east (default 0)"),
                     Schema.P("timeout", "number", "seconds to wait for the vessel to settle (default 60)")),
                 SetPosition);
+            yield return new Tool("get_terrain",
+                "Reads the terrain of a body at a point, as the game computes it: the body's radius, the height " +
+                "of the terrain above it, whether the sea covers it, and its slope and roughness (the largest " +
+                "difference of height) from the heights at four points around it.",
+                Schema.Object(
+                    Schema.P("body", "string", "the body's name (default: the active vessel's)"),
+                    Schema.P("latitude", "number", "degrees", true),
+                    Schema.P("longitude", "number", "degrees", true),
+                    Schema.P("spacing", "number", "metres from the point to the four points of the slope (default 5)")),
+                GetTerrain);
             yield return new Tool("set_orbit",
                 "Puts the active vessel on an orbit, as Set Orbit of the Alt+F12 menu does, and waits until " +
                 "physics runs on it again.",
@@ -657,22 +670,49 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail(error);
                 yield break;
             }
-            // As the menu does it, with the vessel upright and eased down onto the ground: never under the
-            // sea, and the altitude counted from the terrain.
-            FlightGlobals.fetch.SetVesselPosition(body, call.Number("latitude"), call.Number("longitude"),
-                call.Number("altitude", 2.0), 0.0, call.Number("heading", 0.0), true, true);
+            // A vessel set where another one lies lands on it, and both break.
+            CelestialBody target = FlightGlobals.Bodies[body];
+            double lat = call.Number("latitude");
+            double lon = call.Number("longitude");
+            Vector3d spot = target.GetWorldSurfacePosition(lat, lon, TerrainHeight(target, lat, lon));
+            foreach (Vessel other in FlightGlobals.Vessels)
+            {
+                if (other == null || other == FlightGlobals.ActiveVessel || other.mainBody != target)
+                {
+                    continue;
+                }
+                double distance = Vector3d.Distance(other.GetWorldPos3D(), spot);
+                if (distance < 50.0)
+                {
+                    call.Fail(other.vesselName + " (" + other.id + ") lies " + distance.ToString("F1") + " m from that point");
+                    yield break;
+                }
+            }
+
+            // As the menu does it, never under the sea and the altitude counted from the terrain, but without
+            // its ease to the ground: the game loses the lighter gravity of that ease when the vessel goes off
+            // rails while keeping it flagged, so a vessel set high falls at full weight. Set it a little above the
+            // ground instead.
+            FlightGlobals.fetch.SetVesselPosition(body, lat, lon, call.Number("altitude", 1.0), call.Number("pitch", 0.0),
+                call.Number("heading", 0.0), true, false);
             FloatingOrigin.ResetTerrainShaderOffset();
 
-            // Settled: on the ground, out of the ease-in, and still for two seconds in a row.
-            Vessel vessel = FlightGlobals.ActiveVessel;
+            // Settled: on the ground, and still for two seconds in a row.
+            Vessel placed = FlightGlobals.ActiveVessel;
             float start = Time.realtimeSinceStartup;
             float stillSince = -1f;
             float limit = (float)call.Number("timeout", 60.0);
             while (Time.realtimeSinceStartup - start < limit)
             {
                 yield return null;
-                vessel = FlightGlobals.ActiveVessel;
-                bool down = vessel != null && !vessel.packed && !vessel.easingInToSurface
+                Vessel vessel = FlightGlobals.ActiveVessel;
+                // A vessel that broke on landing is no longer the active one, or is dead.
+                if (vessel != placed || vessel.state == Vessel.State.DEAD)
+                {
+                    call.Fail("The vessel was destroyed while it was put down");
+                    yield break;
+                }
+                bool down = vessel != null && !vessel.packed
                     && (vessel.situation == Vessel.Situations.LANDED || vessel.situation == Vessel.Situations.SPLASHED
                         || vessel.situation == Vessel.Situations.PRELAUNCH);
                 if (down && vessel.srfSpeed < 0.01)
@@ -693,6 +733,58 @@ namespace com.github.lhervier.ksp.mcpserver
                 }
             }
             call.Fail("The vessel had not settled after " + limit + " s: " + Json.Write(State()));
+        }
+
+        private static IEnumerator GetTerrain(ToolCall call)
+        {
+            if (FlightGlobals.Bodies == null || (!call.Has("body") && FlightGlobals.ActiveVessel == null))
+            {
+                call.Fail("Name a body, or be in flight");
+                yield break;
+            }
+            string error;
+            int index = BodyIndex(call, out error);
+            if (index < 0)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            CelestialBody body = FlightGlobals.Bodies[index];
+            if (body.pqsController == null)
+            {
+                call.Fail(body.bodyName + " has no terrain");
+                yield break;
+            }
+            double lat = call.Number("latitude");
+            double lon = call.Number("longitude");
+            double spacing = call.Number("spacing", 5.0);
+            double height = TerrainHeight(body, lat, lon);
+
+            // The four points north, south, east and west of it, by the angle the spacing makes at the centre.
+            double radius = body.Radius + height;
+            double dLat = spacing / radius * 180.0 / Math.PI;
+            double dLon = dLat / Math.Max(Math.Cos(lat * Math.PI / 180.0), 1e-6);
+            double north = TerrainHeight(body, lat + dLat, lon);
+            double south = TerrainHeight(body, lat - dLat, lon);
+            double east = TerrainHeight(body, lat, lon + dLon);
+            double west = TerrainHeight(body, lat, lon - dLon);
+            double gradient = Math.Sqrt(Math.Pow((north - south) / (2 * spacing), 2) + Math.Pow((east - west) / (2 * spacing), 2));
+            call.Text(new Dictionary<string, object>
+            {
+                { "body", body.bodyName },
+                { "radius", body.Radius },
+                { "height", height },
+                { "underSea", body.ocean && height < 0.0 },
+                { "slope", Math.Atan(gradient) * 180.0 / Math.PI },
+                { "roughness", Math.Max(Math.Max(north, south), Math.Max(east, west))
+                    - Math.Min(Math.Min(north, south), Math.Min(east, west)) }
+            });
+        }
+
+        /// <summary>The height of the terrain of <paramref name="body"/> above its radius at a point.</summary>
+        private static double TerrainHeight(CelestialBody body, double latitude, double longitude)
+        {
+            return body.pqsController.GetSurfaceHeight(body.GetRelSurfaceNVector(latitude, longitude)) - body.Radius;
         }
 
         private static IEnumerator SetOrbit(ToolCall call)
