@@ -95,8 +95,44 @@ namespace com.github.lhervier.ksp.mcpserver
                 "Turns on or off the cheats of the Alt+F12 menu given; those left out are kept. Answers with " +
                 "their state.",
                 Schema.Object(
-                    Schema.P("infinite_electricity", "boolean", "Infinite Electricity")),
+                    Schema.P("infinite_electricity", "boolean", "Infinite Electricity"),
+                    Schema.P("infinite_fuel", "boolean", "Infinite Fuel")),
                 SetCheats);
+            yield return new Tool("set_position",
+                "Moves the active vessel above a point of a body, as Set Position of the Alt+F12 menu does, and " +
+                "lets it settle on the ground: answers once it is landed (or splashed) and still, or after the " +
+                "time limit.",
+                Schema.Object(
+                    Schema.P("body", "string", "the body's name (default: the vessel's)"),
+                    Schema.P("latitude", "number", "degrees", true),
+                    Schema.P("longitude", "number", "degrees", true),
+                    Schema.P("altitude", "number", "metres above the terrain to drop from (default 2)"),
+                    Schema.P("heading", "number", "degrees from north, towards east (default 0)"),
+                    Schema.P("timeout", "number", "seconds to wait for the vessel to settle (default 60)")),
+                SetPosition);
+            yield return new Tool("set_orbit",
+                "Puts the active vessel on an orbit, as Set Orbit of the Alt+F12 menu does, and waits until " +
+                "physics runs on it again.",
+                Schema.Object(
+                    Schema.P("body", "string", "the body's name (default: the vessel's)"),
+                    Schema.P("altitude", "number", "metres above the body's radius, for a circular orbit"),
+                    Schema.P("sma", "number", "semi-major axis in metres, instead of altitude"),
+                    Schema.P("eccentricity", "number", "default 0"),
+                    Schema.P("inclination", "number", "degrees, default 0"),
+                    Schema.P("lan", "number", "longitude of the ascending node, degrees, default 0"),
+                    Schema.P("argument_of_periapsis", "number", "degrees, default 0"),
+                    Schema.P("mean_anomaly", "number", "radians at the current time, default 0")),
+                SetOrbit);
+            yield return new Tool("revert_to_launch",
+                "Reverts the flight to its launch, as Revert to Launch does, and waits until physics runs on " +
+                "the vessel again.",
+                Schema.Object(), RevertToLaunch);
+            yield return new Tool("go_to_scene",
+                "Leaves the flight, or the scene the game is in, for the space centre or the tracking station, " +
+                "saving the game as persistent first as the game's own buttons do, and waits until that scene is up.",
+                Schema.Object(
+                    Schema.P("scene", "string", "SPACECENTER or TRACKSTATION", true)),
+                GoToScene);
             yield return new Tool("quit_game",
                 "Quits KSP, a second after answering, so that the answer gets back first.",
                 Schema.Object(), QuitGame);
@@ -567,11 +603,191 @@ namespace com.github.lhervier.ksp.mcpserver
             {
                 CheatOptions.InfiniteElectricity = call.Bool("infinite_electricity");
             }
+            if (call.Has("infinite_fuel"))
+            {
+                CheatOptions.InfinitePropellant = call.Bool("infinite_fuel");
+            }
             yield return null;
             call.Text(new Dictionary<string, object>
             {
-                { "infinite_electricity", CheatOptions.InfiniteElectricity }
+                { "infinite_electricity", CheatOptions.InfiniteElectricity },
+                { "infinite_fuel", CheatOptions.InfinitePropellant }
             });
+        }
+
+        /// <summary>
+        /// The index in <see cref="FlightGlobals.Bodies"/> of the body named in the call, or of the active
+        /// vessel's body when none is; -1 with <paramref name="error"/> set when there is no such body.
+        /// </summary>
+        private static int BodyIndex(ToolCall call, out string error)
+        {
+            error = null;
+            string name = call.String("body", FlightGlobals.ActiveVessel.mainBody.bodyName);
+            for (int i = 0; i < FlightGlobals.Bodies.Count; i++)
+            {
+                if (string.Equals(FlightGlobals.Bodies[i].bodyName, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+            error = "No body named " + name;
+            return -1;
+        }
+
+        private static bool InFlight(ToolCall call)
+        {
+            if (HighLogic.LoadedSceneIsFlight && FlightGlobals.ready && FlightGlobals.ActiveVessel != null)
+            {
+                return true;
+            }
+            call.Fail("Not in flight");
+            return false;
+        }
+
+        private static IEnumerator SetPosition(ToolCall call)
+        {
+            if (!InFlight(call))
+            {
+                yield break;
+            }
+            string error;
+            int body = BodyIndex(call, out error);
+            if (body < 0)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            // As the menu does it, with the vessel upright and eased down onto the ground: never under the
+            // sea, and the altitude counted from the terrain.
+            FlightGlobals.fetch.SetVesselPosition(body, call.Number("latitude"), call.Number("longitude"),
+                call.Number("altitude", 2.0), 0.0, call.Number("heading", 0.0), true, true);
+            FloatingOrigin.ResetTerrainShaderOffset();
+
+            // Settled: on the ground, out of the ease-in, and still for two seconds in a row.
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            float start = Time.realtimeSinceStartup;
+            float stillSince = -1f;
+            float limit = (float)call.Number("timeout", 60.0);
+            while (Time.realtimeSinceStartup - start < limit)
+            {
+                yield return null;
+                vessel = FlightGlobals.ActiveVessel;
+                bool down = vessel != null && !vessel.packed && !vessel.easingInToSurface
+                    && (vessel.situation == Vessel.Situations.LANDED || vessel.situation == Vessel.Situations.SPLASHED
+                        || vessel.situation == Vessel.Situations.PRELAUNCH);
+                if (down && vessel.srfSpeed < 0.01)
+                {
+                    if (stillSince < 0f)
+                    {
+                        stillSince = Time.realtimeSinceStartup;
+                    }
+                    else if (Time.realtimeSinceStartup - stillSince >= 2f)
+                    {
+                        call.Text(State());
+                        yield break;
+                    }
+                }
+                else
+                {
+                    stillSince = -1f;
+                }
+            }
+            call.Fail("The vessel had not settled after " + limit + " s: " + Json.Write(State()));
+        }
+
+        private static IEnumerator SetOrbit(ToolCall call)
+        {
+            if (!InFlight(call))
+            {
+                yield break;
+            }
+            string error;
+            int body = BodyIndex(call, out error);
+            if (body < 0)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            double sma = call.Has("sma") ? call.Number("sma")
+                : call.Has("altitude") ? FlightGlobals.Bodies[body].Radius + call.Number("altitude") : double.NaN;
+            if (double.IsNaN(sma))
+            {
+                call.Fail("Give either altitude or sma");
+                yield break;
+            }
+            FlightGlobals.fetch.SetShipOrbit(body, call.Number("eccentricity", 0.0), sma, call.Number("inclination", 0.0),
+                call.Number("lan", 0.0), call.Number("mean_anomaly", 0.0), call.Number("argument_of_periapsis", 0.0), 0.0);
+            FloatingOrigin.ResetTerrainShaderOffset();
+
+            // The vessel is packed for the move, and unpacked a few frames later.
+            yield return null;
+            float start = Time.realtimeSinceStartup;
+            while (FlightGlobals.ActiveVessel == null || FlightGlobals.ActiveVessel.packed)
+            {
+                if (Time.realtimeSinceStartup - start > 60f)
+                {
+                    call.Fail("Physics was not running on the vessel a minute after the orbit was set");
+                    yield break;
+                }
+                yield return null;
+            }
+            call.Text(State());
+        }
+
+        private static IEnumerator RevertToLaunch(ToolCall call)
+        {
+            if (!InFlight(call))
+            {
+                yield break;
+            }
+            if (!FlightDriver.CanRevertToPostInit || FlightDriver.PostInitState == null)
+            {
+                call.Fail("This flight cannot be reverted to its launch");
+                yield break;
+            }
+            Vessel previous = FlightGlobals.ActiveVessel;
+            FlightDriver.RevertToLaunch();
+            yield return WaitForNewActiveVessel(call, previous);
+        }
+
+        private static IEnumerator GoToScene(ToolCall call)
+        {
+            GameScenes scene;
+            switch ((call.String("scene") ?? "").ToUpperInvariant())
+            {
+                case "SPACECENTER":
+                    scene = GameScenes.SPACECENTER;
+                    break;
+                case "TRACKSTATION":
+                    scene = GameScenes.TRACKSTATION;
+                    break;
+                default:
+                    call.Fail("scene: SPACECENTER or TRACKSTATION");
+                    yield break;
+            }
+            if (HighLogic.CurrentGame == null)
+            {
+                call.Fail("No game loaded");
+                yield break;
+            }
+            SceneWatch watch = new SceneWatch(scene);
+            GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
+            // What the buttons above the altimeter do in flight, and what leaving any other scene does.
+            GamePersistence.SaveGame("persistent", HighLogic.SaveFolder, SaveMode.OVERWRITE);
+            HighLogic.LoadScene(scene);
+            float start = Time.realtimeSinceStartup;
+            while (!watch.Loaded)
+            {
+                if (Time.realtimeSinceStartup - start > 180f)
+                {
+                    GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+                    call.Fail("The scene " + scene + " was not up after 3 minutes");
+                    yield break;
+                }
+                yield return null;
+            }
+            GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+            call.Text(State());
         }
 
         private static IEnumerator QuitGame(ToolCall call)
