@@ -550,8 +550,14 @@ namespace com.github.lhervier.ksp.mcpserver
         {
             yield return new WaitForEndOfFrame();
             Texture2D texture = ScreenCapture.CaptureScreenshotAsTexture();
-            byte[] png = texture.EncodeToPNG();
+            // The screen's alpha is whatever the shaders wrote, and the terrain's writes zero: kept, the ground
+            // shows as transparent, white or black depending on the viewer. Encode the colours alone.
+            Texture2D opaque = new Texture2D(texture.width, texture.height, TextureFormat.RGB24, false);
+            opaque.SetPixels32(texture.GetPixels32());
+            opaque.Apply();
+            byte[] png = opaque.EncodeToPNG();
             UnityEngine.Object.Destroy(texture);
+            UnityEngine.Object.Destroy(opaque);
 
             string path = call.String("path");
             if (!string.IsNullOrEmpty(path))
