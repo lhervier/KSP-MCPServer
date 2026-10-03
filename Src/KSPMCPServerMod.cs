@@ -24,6 +24,7 @@ namespace com.github.lhervier.ksp.mcpserver
             List<Tool> tools = new List<Tool>();
             tools.AddRange(GameTools.All());
             tools.AddRange(DriveTools.All());
+            tools.AddRange(FlightTools.All());
             tools.AddRange(ReflectionTools.All());
             tools.AddRange(ExtensionTools.All());
 

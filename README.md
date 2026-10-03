@@ -15,7 +15,7 @@ world, and this mod parks it there to within a centimetre
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
-some people would rather stop reading here. What there is to check here is small: the source is eleven
+some people would rather stop reading here. What there is to check here is small: the source is twelve
 short files, it opens no port beyond the loopback address, and it changes nothing in the game until a
 request asks it to.
 
@@ -47,6 +47,8 @@ when the rover is parked, `load_save` when the vessel is in flight and physics r
 | `go_to_scene` | leaves for the space centre or the tracking station, saving the game first as the game's own buttons do |
 | `quit_game` | quits KSP, a second after answering |
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
+| `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
+| `stage` | activates the next stage, as the space bar does |
 | `drive` | drives a rover along a heading, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
 | `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, and stops there with the brakes on, still |
 | `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say |
