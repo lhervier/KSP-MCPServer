@@ -15,7 +15,7 @@ world, and this mod parks it there to within a centimetre
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
-some people would rather stop reading here. What there is to check here is small: the source is twelve
+some people would rather stop reading here. What there is to check here is small: the source is thirteen
 short files, it opens no port beyond the loopback address, and it changes nothing in the game until a
 request asks it to.
 
