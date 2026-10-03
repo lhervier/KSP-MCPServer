@@ -80,12 +80,14 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("return_image", "boolean", "whether to return the image (default true)")),
                 Screenshot);
             yield return new Tool("set_camera",
-                "Sets the flight camera: distance from the vessel in metres, heading and pitch in degrees. " +
-                "Values left out are kept.",
+                "Sets the flight camera: distance from the vessel in metres, heading (the direction it looks in, " +
+                "from north towards east) and pitch in degrees, and its field of view, which Alt and the mouse " +
+                "wheel narrow (20 to 160 degrees, 60 by default). Values left out are kept.",
                 Schema.Object(
                     Schema.P("distance", "number", "metres"),
                     Schema.P("heading", "number", "degrees"),
-                    Schema.P("pitch", "number", "degrees")),
+                    Schema.P("pitch", "number", "degrees"),
+                    Schema.P("fov", "number", "field of view, degrees")),
                 SetCamera);
             yield return new Tool("set_ui",
                 "Hides or shows the game's interface in flight, as F2 does: navball, staging, toolbars. Windows " +
@@ -605,12 +607,19 @@ namespace com.github.lhervier.ksp.mcpserver
             {
                 camera.camPitch = (float)(call.Number("pitch") * Math.PI / 180.0);
             }
+            if (call.Has("fov"))
+            {
+                // What Alt and the mouse wheel do: the field kept by the camera, then applied to its cameras.
+                camera.FieldOfView = Mathf.Clamp((float)call.Number("fov"), camera.fovMin, camera.fovMax);
+                camera.SetFoV(camera.FieldOfView);
+            }
             yield return null;
             call.Text(new Dictionary<string, object>
             {
                 { "distance", (double)camera.Distance },
                 { "heading", camera.camHdg * 180.0 / Math.PI },
-                { "pitch", camera.camPitch * 180.0 / Math.PI }
+                { "pitch", camera.camPitch * 180.0 / Math.PI },
+                { "fov", (double)camera.FieldOfView }
             });
         }
 
