@@ -82,13 +82,22 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool("set_camera",
                 "Sets the flight camera: distance from the vessel in metres, heading (the direction it looks in, " +
                 "from north towards east) and pitch in degrees, and its field of view, which Alt and the mouse " +
-                "wheel narrow (20 to 160 degrees, 60 by default). Values left out are kept.",
+                "wheel narrow (20 to 160 degrees, 60 by default), and where it aims away from the vessel, as " +
+                "dragging with the middle mouse button does (at most half the field of view either way). Values " +
+                "left out are kept.",
                 Schema.Object(
                     Schema.P("distance", "number", "metres"),
                     Schema.P("heading", "number", "degrees"),
                     Schema.P("pitch", "number", "degrees"),
-                    Schema.P("fov", "number", "field of view, degrees")),
+                    Schema.P("fov", "number", "field of view, degrees"),
+                    Schema.P("aim_heading", "number", "degrees to the right of the vessel, middle mouse button"),
+                    Schema.P("aim_pitch", "number", "degrees below the vessel, middle mouse button")),
                 SetCamera);
+            yield return new Tool("set_time",
+                "Sets the universal time of the game, in seconds, in any scene but the main menu: the time of " +
+                "day at a spot, for one. A flight reverted to its launch goes back to the time of the launch.",
+                Schema.Object(Schema.P("ut", "number", "seconds", true)),
+                SetTime);
             yield return new Tool("set_ui",
                 "Hides or shows the game's interface in flight, as F2 does: navball, staging, toolbars. Windows " +
                 "of mods that do not follow it stay.",
@@ -613,14 +622,45 @@ namespace com.github.lhervier.ksp.mcpserver
                 camera.FieldOfView = Mathf.Clamp((float)call.Number("fov"), camera.fovMin, camera.fovMax);
                 camera.SetFoV(camera.FieldOfView);
             }
+            // What dragging with the middle mouse button changes: the aim, not the place of the camera. The game
+            // keeps these fields protected, and clamps them every frame to half the field of view.
+            if (call.Has("aim_heading"))
+            {
+                AimField("offsetHdg").SetValue(camera, (float)(call.Number("aim_heading") * Math.PI / 180.0));
+            }
+            if (call.Has("aim_pitch"))
+            {
+                AimField("offsetPitch").SetValue(camera, (float)(call.Number("aim_pitch") * Math.PI / 180.0));
+            }
             yield return null;
             call.Text(new Dictionary<string, object>
             {
                 { "distance", (double)camera.Distance },
                 { "heading", camera.camHdg * 180.0 / Math.PI },
                 { "pitch", camera.camPitch * 180.0 / Math.PI },
-                { "fov", (double)camera.FieldOfView }
+                { "fov", (double)camera.FieldOfView },
+                { "aimHeading", (float)AimField("offsetHdg").GetValue(camera) * 180.0 / Math.PI },
+                { "aimPitch", (float)AimField("offsetPitch").GetValue(camera) * 180.0 / Math.PI }
             });
+        }
+
+        /// <summary>A protected field of <see cref="FlightCamera"/> that holds where it aims.</summary>
+        private static System.Reflection.FieldInfo AimField(string name)
+        {
+            return typeof(FlightCamera).GetField(name,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        }
+
+        private static IEnumerator SetTime(ToolCall call)
+        {
+            if (Planetarium.fetch == null)
+            {
+                call.Fail("No game loaded");
+                yield break;
+            }
+            Planetarium.SetUniversalTime(call.Number("ut"));
+            yield return null;
+            call.Text(State());
         }
 
         private static IEnumerator SetUi(ToolCall call)

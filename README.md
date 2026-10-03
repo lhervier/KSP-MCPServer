@@ -36,8 +36,9 @@ when the rover is parked, `load_save` when the vessel is in flight and physics r
 | `switch_vessel` | makes a loaded vessel the active one, as the switch vessel keys `[` and `]` do |
 | `set_target` | sets the active vessel's target to another vessel, or clears it |
 | `screenshot` | captures the screen, interface included; returns the image and saves it as a PNG |
-| `set_camera` | the flight camera's distance, heading and pitch |
+| `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
+| `set_time` | sets the universal time of the game: the time of day at a spot |
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
 | `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |
