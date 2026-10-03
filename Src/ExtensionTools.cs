@@ -154,7 +154,7 @@ namespace com.github.lhervier.ksp.mcpserver
             }
             call.Text(method.ReturnType == typeof(void) ? (object)"done" : new Dictionary<string, object>
             {
-                { "returned", ReflectionTools.ToJson(result, 3) }
+                { "returned", ReflectionTools.ToJson(result, 6) }
             });
         }
     }
