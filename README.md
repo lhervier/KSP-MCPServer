@@ -32,10 +32,14 @@ when the rover is parked, `load_save` when the vessel is in flight and physics r
 | `load_save` | loads a save into flight, from any scene |
 | `save_game` | saves the game as it is now under a name, as a quicksave does |
 | `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does |
+| `list_vessels` | the vessels of the game: id, name, situation, loaded or not, packed or not, active or target, distance from the active vessel |
+| `switch_vessel` | makes a loaded vessel the active one, as the switch vessel keys `[` and `]` do |
+| `set_target` | sets the active vessel's target to another vessel, or clears it |
 | `screenshot` | captures the screen, interface included; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch |
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
+| `set_cheats` | turns cheats of the `Alt+F12` menu on or off: for now *Infinite Electricity* only |
 | `quit_game` | quits KSP, a second after answering |
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
 | `drive` | drives a rover along a heading, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |

@@ -56,6 +56,22 @@ namespace com.github.lhervier.ksp.mcpserver
                         "(SPH/<name>.craft or VAB/<name>.craft)", true),
                     Schema.P("site", "string", "the launch site's name (default Runway; LaunchPad for the pad)")),
                 LaunchVessel);
+            yield return new Tool("list_vessels",
+                "Lists the vessels of the game: id, name, situation, body, whether each is loaded and packed, " +
+                "whether it is the active vessel or its target, and its distance from the active vessel in metres.",
+                Schema.Object(), ListVessels);
+            yield return new Tool("switch_vessel",
+                "Makes a loaded vessel the active one, as the switch vessel keys [ and ] do, and waits until " +
+                "physics runs on it.",
+                Schema.Object(
+                    Schema.P("vessel", "string", "the vessel's id, or its name when no other vessel bears it", true)),
+                SwitchVessel);
+            yield return new Tool("set_target",
+                "Sets the target of the active vessel to another vessel, as Set as Target does, or clears it.",
+                Schema.Object(
+                    Schema.P("vessel", "string",
+                        "the vessel's id, or its name when no other vessel bears it; left out, clears the target")),
+                SetTarget);
             yield return new Tool("screenshot",
                 "Captures the screen as it is drawn, user interface included. Returns the image, and saves it " +
                 "as a PNG when a path is given (relative to the KSP folder, or absolute).",
@@ -75,6 +91,12 @@ namespace com.github.lhervier.ksp.mcpserver
                 "Pauses or resumes the flight, as Escape does, without the menu.",
                 Schema.Object(Schema.P("paused", "boolean", "true to pause", true)),
                 SetPause);
+            yield return new Tool("set_cheats",
+                "Turns on or off the cheats of the Alt+F12 menu given; those left out are kept. Answers with " +
+                "their state.",
+                Schema.Object(
+                    Schema.P("infinite_electricity", "boolean", "Infinite Electricity")),
+                SetCheats);
             yield return new Tool("quit_game",
                 "Quits KSP, a second after answering, so that the answer gets back first.",
                 Schema.Object(), QuitGame);
@@ -338,6 +360,143 @@ namespace com.github.lhervier.ksp.mcpserver
             call.Text(State());
         }
 
+        private static IEnumerator ListVessels(ToolCall call)
+        {
+            if (!HighLogic.LoadedSceneIsFlight || FlightGlobals.fetch == null)
+            {
+                call.Fail("Not in flight");
+                yield break;
+            }
+            Vessel active = FlightGlobals.ActiveVessel;
+            ITargetable target = FlightGlobals.fetch.VesselTarget;
+            Vessel targetVessel = target != null ? target.GetVessel() : null;
+            List<object> vessels = new List<object>();
+            foreach (Vessel v in FlightGlobals.Vessels)
+            {
+                if (v == null)
+                {
+                    continue;
+                }
+                vessels.Add(new Dictionary<string, object>
+                {
+                    { "id", v.id.ToString() },
+                    { "name", v.vesselName },
+                    { "situation", v.situation.ToString() },
+                    { "body", v.mainBody != null ? v.mainBody.bodyName : null },
+                    { "loaded", v.loaded },
+                    { "packed", v.packed },
+                    { "active", v == active },
+                    { "target", v == targetVessel },
+                    { "distance", active != null ? Vector3d.Distance(v.GetWorldPos3D(), active.GetWorldPos3D()) : double.NaN }
+                });
+            }
+            call.Text(vessels);
+        }
+
+        private static IEnumerator SwitchVessel(ToolCall call)
+        {
+            string error;
+            Vessel vessel = FindVessel(call.String("vessel"), out error);
+            if (vessel == null)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            if (!vessel.loaded)
+            {
+                call.Fail(vessel.vesselName + " is not loaded: only a vessel within loading range can be switched to");
+                yield break;
+            }
+            if (vessel != FlightGlobals.ActiveVessel)
+            {
+                FlightGlobals.SetActiveVessel(vessel);
+            }
+            float start = Time.realtimeSinceStartup;
+            while (FlightGlobals.ActiveVessel != vessel || vessel.packed)
+            {
+                if (Time.realtimeSinceStartup - start > 60f)
+                {
+                    call.Fail("Physics was not running on " + vessel.vesselName + " after a minute");
+                    yield break;
+                }
+                yield return null;
+            }
+            call.Text(State());
+        }
+
+        private static IEnumerator SetTarget(ToolCall call)
+        {
+            if (!HighLogic.LoadedSceneIsFlight || FlightGlobals.fetch == null)
+            {
+                call.Fail("Not in flight");
+                yield break;
+            }
+            if (!call.Has("vessel"))
+            {
+                FlightGlobals.fetch.SetVesselTarget(null);
+                yield return null;
+                call.Text("target cleared");
+                yield break;
+            }
+            string error;
+            Vessel vessel = FindVessel(call.String("vessel"), out error);
+            if (vessel == null)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            if (vessel == FlightGlobals.ActiveVessel)
+            {
+                call.Fail("The active vessel cannot be its own target");
+                yield break;
+            }
+            FlightGlobals.fetch.SetVesselTarget(vessel);
+            yield return null;
+            call.Text("target: " + vessel.vesselName + " (" + vessel.id + ")");
+        }
+
+        /// <summary>
+        /// The vessel of the game whose id is <paramref name="key"/>, or else the only one named so; null with
+        /// <paramref name="error"/> set when there is none, or when the name is shared.
+        /// </summary>
+        private static Vessel FindVessel(string key, out string error)
+        {
+            error = null;
+            if (!HighLogic.LoadedSceneIsFlight || FlightGlobals.fetch == null)
+            {
+                error = "Not in flight";
+                return null;
+            }
+            Vessel found = null;
+            int named = 0;
+            foreach (Vessel v in FlightGlobals.Vessels)
+            {
+                if (v == null)
+                {
+                    continue;
+                }
+                if (string.Equals(v.id.ToString(), key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return v;
+                }
+                if (v.vesselName == key)
+                {
+                    found = v;
+                    named++;
+                }
+            }
+            if (named > 1)
+            {
+                error = named + " vessels are named " + key + ": give its id instead (list_vessels)";
+                return null;
+            }
+            if (found == null)
+            {
+                error = "No vessel has the id or the name " + key;
+            }
+            return found;
+        }
+
         private static IEnumerator Screenshot(ToolCall call)
         {
             yield return new WaitForEndOfFrame();
@@ -400,6 +559,19 @@ namespace com.github.lhervier.ksp.mcpserver
             FlightDriver.SetPause(call.Bool("paused"), false);
             yield return null;
             call.Text(new Dictionary<string, object> { { "paused", FlightDriver.Pause } });
+        }
+
+        private static IEnumerator SetCheats(ToolCall call)
+        {
+            if (call.Has("infinite_electricity"))
+            {
+                CheatOptions.InfiniteElectricity = call.Bool("infinite_electricity");
+            }
+            yield return null;
+            call.Text(new Dictionary<string, object>
+            {
+                { "infinite_electricity", CheatOptions.InfiniteElectricity }
+            });
         }
 
         private static IEnumerator QuitGame(ToolCall call)
