@@ -87,6 +87,11 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("heading", "number", "degrees"),
                     Schema.P("pitch", "number", "degrees")),
                 SetCamera);
+            yield return new Tool("set_ui",
+                "Hides or shows the game's interface in flight, as F2 does: navball, staging, toolbars. Windows " +
+                "of mods that do not follow it stay.",
+                Schema.Object(Schema.P("visible", "boolean", "true to show it, false to hide it", true)),
+                SetUi);
             yield return new Tool("set_pause",
                 "Pauses or resumes the flight, as Escape does, without the menu.",
                 Schema.Object(Schema.P("paused", "boolean", "true to pause", true)),
@@ -607,6 +612,21 @@ namespace com.github.lhervier.ksp.mcpserver
                 { "heading", camera.camHdg * 180.0 / Math.PI },
                 { "pitch", camera.camPitch * 180.0 / Math.PI }
             });
+        }
+
+        private static IEnumerator SetUi(ToolCall call)
+        {
+            // What F2 does: the game and the mods that follow it listen to these two events.
+            if (call.Bool("visible"))
+            {
+                GameEvents.onShowUI.Fire();
+            }
+            else
+            {
+                GameEvents.onHideUI.Fire();
+            }
+            yield return null;
+            call.Text(new Dictionary<string, object> { { "visible", call.Bool("visible") } });
         }
 
         private static IEnumerator SetPause(ToolCall call)
