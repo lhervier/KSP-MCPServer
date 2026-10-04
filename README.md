@@ -125,6 +125,15 @@ one at all can declare its own attribute class of that name, with `Name` and `De
 KSP Diag - Terrain Height and Diag FloatingOrigin offer their Record and Clear buttons this way, the reading of
 their table, and the moving, showing and hiding of their window.
 
+## Performance
+
+Timed frame by frame in flight with [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler), three
+runs played by hand without this mod and three played by script through it: the coroutines the terrain is
+updated in cost at most about 0.05 ms more per frame by script, and nothing larger stands out of the spread
+between runs.
+
+**→ Full chapter: [Performance](docs/performance.md)**
+
 ## Build
 
 Clone this repository, set `KSPDIR` to your KSP install folder and run `build.bat`. It needs the .NET
