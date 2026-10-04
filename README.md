@@ -15,14 +15,16 @@ world, and this mod parks it there to within a centimetre
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
-some people would rather stop reading here. What there is to check here is small: the source is thirteen
+some people would rather stop reading here. What there is to check here is small: the source is fourteen
 short files, it opens no port beyond the loopback address, and it changes nothing in the game until a
 request asks it to.
 
 ## What it offers
 
 Every tool runs on the game's main thread, one at a time, and answers once it is done: `drive_to` answers
-when the rover is parked, `load_save` when the vessel is in flight and physics runs on it.
+when the rover is parked, `load_save` when the vessel is in flight and physics runs on it. While it runs,
+a short message at the top of the screen names it, with its arguments, so that whoever watches the game
+sees what drives it: one message at a time, each tool's replacing the last, and never on a screenshot.
 
 | tool | what it does |
 |---|---|
@@ -35,7 +37,7 @@ when the rover is parked, `load_save` when the vessel is in flight and physics r
 | `list_vessels` | the vessels of the game: id, name, situation, loaded or not, packed or not, active or target, distance from the active vessel |
 | `switch_vessel` | makes a loaded vessel the active one, as the switch vessel keys `[` and `]` do |
 | `set_target` | sets the active vessel's target to another vessel, or clears it |
-| `screenshot` | captures the screen, interface included; returns the image and saves it as a PNG |
+| `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
 | `set_time` | sets the universal time of the game: the time of day at a spot |
@@ -64,7 +66,12 @@ Other mods can add their own tools, without depending on this one: see
 Copy `GameData/KSPMCPServer/` into the `GameData` folder of KSP. When KSP starts, its log reads
 `[KSP-MCPServer] Listening on http://127.0.0.1:8770/mcp/`.
 
-The port is in `GameData/KSPMCPServer/PluginData/settings.cfg`, read when KSP starts.
+Its settings are in `GameData/KSPMCPServer/PluginData/settings.cfg`, read when KSP starts:
+
+| setting | default | what it does |
+|---|---|---|
+| `port` | `8770` | the TCP port it listens on |
+| `screen_messages` | `true` | whether each tool shows its name at the top of the screen while it runs; `false` turns the messages off |
 
 It listens on `127.0.0.1` only: nothing outside the computer KSP runs on can reach it.
 
@@ -116,7 +123,7 @@ one at all can declare its own attribute class of that name, with `Name` and `De
   fields of any other object. A `void` method answers `done`.
 
 KSP Diag - Terrain Height and Diag FloatingOrigin offer their Record and Clear buttons this way, the reading of
-their table, and the moving of their window.
+their table, and the moving, showing and hiding of their window.
 
 ## Build
 

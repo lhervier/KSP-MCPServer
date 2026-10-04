@@ -201,7 +201,7 @@ namespace com.github.lhervier.ksp.mcpserver
                 : null;
 
             ToolCall call = new ToolCall(arguments);
-            Exception failure = MainThread.RunAndWait(tool.Run(call));
+            Exception failure = MainThread.RunAndWait(ToolMessage.Announced(name, call.Arguments, tool.Run(call)));
             if (failure != null)
             {
                 call.Fail(name + " threw: " + failure.Message);

@@ -28,9 +28,11 @@ namespace com.github.lhervier.ksp.mcpserver
             tools.AddRange(ReflectionTools.All());
             tools.AddRange(ExtensionTools.All());
 
+            ConfigNode settings = ReadSettings();
+            ToolMessage.SetEnabled(ReadBool(settings, "screen_messages", true));
             try
             {
-                _server = new McpHttpServer(ReadPort(), tools);
+                _server = new McpHttpServer(ReadPort(settings), tools);
                 _server.Start();
             }
             catch (Exception e)
@@ -79,17 +81,33 @@ namespace com.github.lhervier.ksp.mcpserver
             GameTools.OnFlightReady();
         }
 
-        // The port, from PluginData/settings.cfg next to the DLL; the default when it is not there.
-        private static int ReadPort()
+        // PluginData/settings.cfg next to the DLL; null when it is not there.
+        private static ConfigNode ReadSettings()
         {
             string path = Path.Combine(Path.GetDirectoryName(typeof(KSPMCPServerMod).Assembly.Location) ?? "", "PluginData/settings.cfg");
-            ConfigNode node = File.Exists(path) ? ConfigNode.Load(path) : null;
+            return File.Exists(path) ? ConfigNode.Load(path) : null;
+        }
+
+        // The port from the settings; the default when it is not there.
+        private static int ReadPort(ConfigNode settings)
+        {
             int port;
-            if (node != null && int.TryParse(node.GetValue("port"), out port))
+            if (settings != null && int.TryParse(settings.GetValue("port"), out port))
             {
                 return port;
             }
             return DefaultPort;
+        }
+
+        // A true or false value from the settings; the fallback when it is not there or not a boolean.
+        private static bool ReadBool(ConfigNode settings, string name, bool fallback)
+        {
+            bool value;
+            if (settings != null && bool.TryParse(settings.GetValue(name), out value))
+            {
+                return value;
+            }
+            return fallback;
         }
     }
 }
