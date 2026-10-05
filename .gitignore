@@ -3,3 +3,4 @@ obj/
 GameData/KSPMCPServer/*.dll
 GameData/KSPMCPServer/*.zip
 CLAUDE.md
+__pycache__/
