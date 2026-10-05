@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using UnityEngine;
 
 namespace com.github.lhervier.ksp.mcpserver
@@ -39,6 +40,15 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("folder", "string", "the game's folder under saves/", true),
                     Schema.P("save", "string", "the save's name, without .sfs (default persistent)")),
                 OpenGame);
+            yield return new Tool("play_mission",
+                "Starts a mission of Making History from the main menu, from its start, as Play Missions does: " +
+                "the mission's own game is set up, its launch sites placed, and the game opens in the scene the " +
+                "mission starts in. Waits until that scene is up. Needs the expansion, and the main menu.",
+                Schema.Object(
+                    Schema.P("mission", "string",
+                        "the mission's folder: absolute, or its name under the user's Missions folder or the " +
+                        "expansion's stock missions", true)),
+                PlayMission);
             yield return new Tool("save_game",
                 "Saves the game as it is now, as a quicksave does, to saves/<folder>/<save>.sfs, overwriting it. " +
                 "Saved from flight, the save opens in flight.",
@@ -325,6 +335,119 @@ namespace com.github.lhervier.ksp.mcpserver
             }
             GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
             call.Text(State());
+        }
+
+        private static IEnumerator PlayMission(ToolCall call)
+        {
+            if (!Expansions.ExpansionsLoader.IsExpansionInstalled("MakingHistory"))
+            {
+                call.Fail("Making History is not installed");
+                yield break;
+            }
+            if (HighLogic.LoadedScene != GameScenes.MAINMENU || Expansions.Missions.Runtime.MissionSystem.Instance == null)
+            {
+                call.Fail("Missions start from the main menu, and the game is in " + HighLogic.LoadedScene);
+                yield break;
+            }
+            string file = MissionFile(call.String("mission"));
+            if (file == null)
+            {
+                call.Fail("No mission " + call.String("mission") + " (persistent.mission not found)");
+                yield break;
+            }
+            Expansions.Missions.MissionFileInfo info = Expansions.Missions.MissionFileInfo.CreateFromPath(file);
+
+            // What Play Missions does once a mission is picked: clear what an earlier mission left, set the
+            // mission's game up, then start that game and clear the objects the setup used.
+            MethodInfo removeObjects = typeof(Expansions.Missions.Runtime.MissionSystem).GetMethod("RemoveMissionObjects",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (removeObjects == null)
+            {
+                call.Fail("MissionSystem.RemoveMissionObjects not found in this version of KSP");
+                yield break;
+            }
+            removeObjects.Invoke(null, new object[] { true });
+            MissionStart start = new MissionStart();
+            Expansions.Missions.Runtime.MissionSystem.Instance.StartCoroutine(
+                Expansions.Missions.Runtime.MissionSystem.Instance.SetupMissionGame(info, true, false,
+                    () => start.Succeeded = true, () => start.Failed = true));
+            float begin = Time.realtimeSinceStartup;
+            while (!start.Succeeded && !start.Failed)
+            {
+                if (Time.realtimeSinceStartup - begin > 180f)
+                {
+                    call.Fail("The mission was not set up after 3 minutes");
+                    yield break;
+                }
+                yield return null;
+            }
+            if (start.Failed || HighLogic.CurrentGame == null)
+            {
+                removeObjects.Invoke(null, new object[] { false });
+                call.Fail("KSP could not set the mission up: see KSP.log");
+                yield break;
+            }
+
+            Game game = HighLogic.CurrentGame;
+            Vessel previous = FlightGlobals.ActiveVessel;
+            SceneWatch watch = new SceneWatch(game.startScene);
+            GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
+            game.Start();
+            removeObjects.Invoke(null, new object[] { false });
+
+            if (game.startScene == GameScenes.FLIGHT)
+            {
+                GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+                yield return WaitForNewActiveVessel(call, previous);
+                yield break;
+            }
+            begin = Time.realtimeSinceStartup;
+            while (!watch.Loaded)
+            {
+                if (Time.realtimeSinceStartup - begin > 180f)
+                {
+                    GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+                    call.Fail("The scene " + game.startScene + " was not up after 3 minutes");
+                    yield break;
+                }
+                yield return null;
+            }
+            GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+            call.Text(State());
+        }
+
+        /// <summary>
+        /// The <c>persistent.mission</c> file of a mission given by its folder: absolute, or a folder name
+        /// looked up among the user's missions, then the expansion's stock missions. Null if there is none.
+        /// </summary>
+        private static string MissionFile(string mission)
+        {
+            List<string> folders = new List<string>();
+            if (Path.IsPathRooted(mission))
+            {
+                folders.Add(mission);
+            }
+            else
+            {
+                folders.Add(Path.Combine(Expansions.Missions.MissionsUtils.UsersMissionsPath, mission));
+                folders.Add(Path.Combine(Expansions.Missions.MissionsUtils.StockMissionsPath, mission));
+            }
+            foreach (string folder in folders)
+            {
+                string file = Path.GetFullPath(Path.Combine(folder, "persistent.mission"));
+                if (File.Exists(file))
+                {
+                    return file;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>How the setup of a mission ended, filled by its callbacks.</summary>
+        private sealed class MissionStart
+        {
+            public bool Succeeded;
+            public bool Failed;
         }
 
         /// <summary>Tells when a given scene has loaded. An instance, since an event refuses a static handler.</summary>
