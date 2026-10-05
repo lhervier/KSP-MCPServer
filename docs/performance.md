@@ -4,8 +4,8 @@ Part of [KSP-MCPServer](../README.md). The short version is on the main page, un
 
 Other mods publish frame timings taken with [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler)
 in runs played by a script through this server:
-[Terrain Precision Fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/master/docs/performance.md)
-and [Rock Precision Fix](https://github.com/lhervier/KSP-RockPrecisionFix/blob/master/docs/performance.md).
+[Terrain Precision Fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/docs/performance.md)
+and [Rock Precision Fix](https://github.com/lhervier/KSP-RockPrecisionFix/blob/main/docs/performance.md).
 The question here is whether driving KSP through this mod changes what a frame costs. The same runs were
 played both ways: by hand, without this mod, and by script, through it.
 
@@ -38,7 +38,7 @@ KsmUI library it ships with, in every run, and nothing else. The two configurati
 - **by hand**: KSPProfiler 1.0.0, without this mod, its buttons pressed by hand;
 - **by script**: this mod, and [a fork of KSPProfiler](https://github.com/lhervier/KSP-ExtMod-KSPProfiler)
   which only adds this server's tools for its window's buttons — nothing in what it measures changed —
-  pressed by [`run-perfs.py`](https://github.com/lhervier/KSP-PQSBench/blob/master/perfs/automation/run-perfs.py),
+  pressed by [`run-perfs.py`](https://github.com/lhervier/KSP-PQSBench/blob/main/perfs/automation/run-perfs.py),
   a Python script with no dependency. This server's on-screen messages are off
   (`screen_messages = false`).
 
@@ -46,7 +46,7 @@ The two sides differ in those two mods, the fork with the build of KsmUI it ship
 the steps; nothing else.
 
 A command pod on rails in a circular equatorial orbit 5 km over the Mun, from
-[the save PQS Bench provides](https://github.com/lhervier/KSP-PQSBench/blob/master/perfs/ref-mune-5km.sfs).
+[the save PQS Bench provides](https://github.com/lhervier/KSP-PQSBench/blob/main/perfs/ref-mune-5km.sfs).
 Every run times the same 70 seconds of that orbit, from 30 s of mission time. Terrain detail High,
 terrain scatter on at full density.
 
@@ -57,7 +57,7 @@ from another machine, or another session of runs, are not comparable to these.
 ### How the frames were timed
 
 The procedure of
-[PQS Bench's runs](https://github.com/lhervier/KSP-PQSBench/blob/master/docs/measuring-a-terrain-mod.md#the-runs),
+[PQS Bench's runs](https://github.com/lhervier/KSP-PQSBench/blob/main/docs/measuring-a-terrain-mod.md#the-runs),
 with KSPProfiler as the instrument. Each run is a fresh KSP:
 
 1. Load the save. Right after the load, turn the camera to look ahead along the orbit, with the Mun's

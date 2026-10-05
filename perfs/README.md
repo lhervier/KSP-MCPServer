@@ -5,7 +5,7 @@ The logs and CSVs this mod's performance figures are read from. What they say is
 
 Measured with [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler), **by the procedure written in
 [Performance](../docs/performance.md#how-the-frames-were-timed)**: by hand with KSPProfiler 1.0.0, and by
-[this script](https://github.com/lhervier/KSP-PQSBench/blob/master/perfs/automation/run-perfs.py)
+[this script](https://github.com/lhervier/KSP-PQSBench/blob/main/perfs/automation/run-perfs.py)
 through this mod with [a fork of KSPProfiler](https://github.com/lhervier/KSP-ExtMod-KSPProfiler) that
 this mod can drive.
 
@@ -19,7 +19,7 @@ KSPProfiler with the KsmUI library it ships with, in every run, and nothing else
   KSPProfiler fork (version 1.0.0 plus this server's tools for its window's buttons).
 
 A command pod on rails in a circular equatorial orbit 5 km over the Mun, from
-[the save PQS Bench provides](https://github.com/lhervier/KSP-PQSBench/blob/master/perfs/ref-mune-5km.sfs),
+[the save PQS Bench provides](https://github.com/lhervier/KSP-PQSBench/blob/main/perfs/ref-mune-5km.sfs),
 timed from 30 s to 1 min 40 s of mission time, at ×1. In every run, KSP's window was in front of the other
 windows, and the mouse pointer outside it.
 
