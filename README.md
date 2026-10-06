@@ -56,8 +56,10 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `stage` | activates the next stage, as the space bar does |
 | `drive` | drives a rover along a heading, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
 | `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, and stops there with the brakes on, still |
-| `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say |
+| `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components |
 | `call_method` | calls a method without arguments of a loaded object of any mod |
+
+These three take the first loaded object of the type, or with `match` (`path=value`) the first one whose path reads that value.
 
 Other mods can add their own tools, without depending on this one: see
 [Adding tools from another mod](#adding-tools-from-another-mod).
