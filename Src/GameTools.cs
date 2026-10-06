@@ -833,7 +833,8 @@ namespace com.github.lhervier.ksp.mcpserver
         private static int BodyIndex(ToolCall call, out string error)
         {
             error = null;
-            string name = call.String("body", FlightGlobals.ActiveVessel.mainBody.bodyName);
+            // The active vessel is only read when no body is named: outside flight there is none.
+            string name = call.Has("body") ? call.String("body") : FlightGlobals.ActiveVessel.mainBody.bodyName;
             for (int i = 0; i < FlightGlobals.Bodies.Count; i++)
             {
                 if (string.Equals(FlightGlobals.Bodies[i].bodyName, name, StringComparison.OrdinalIgnoreCase))
