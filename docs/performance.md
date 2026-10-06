@@ -5,7 +5,7 @@ Part of [KSP-MCPServer](../README.md). The short version is on the main page, un
 Other mods publish frame timings taken with [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler)
 in runs played by a script through this server:
 [Terrain Precision Fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/docs/performance.md)
-and [Rock Precision Fix](https://github.com/lhervier/KSP-RockPrecisionFix/blob/main/docs/performance.md).
+and [its scatter fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/docs/limits-and-solutions/stock/the-scatter-fix/performance.md).
 The question here is whether driving KSP through this mod changes what a frame costs. The same runs were
 played both ways: by hand, without this mod, and by script, through it.
 
