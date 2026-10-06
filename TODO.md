@@ -33,7 +33,9 @@ What is left to do on KSP-MCPServer, most urgent first.
   no building of the KSC around it; launched from the VAB by hand, the KSC stood there. Find what the
   editor's launch does that `FlightDriver.StartWithNewLaunch` alone does not.
 - **`launch_vessel` waits three minutes** when KSP gives up a launch and goes back to the space centre
-  (a launch site it cannot find): fail as soon as the scene goes back.
+  (a launch site it cannot find): fail as soon as the scene goes back. Seen from flight with the Mun
+  loaded: `Cannot find a transform named 'Facility/LaunchPad_spawn'`, then the space centre, and the
+  server answered nothing more until KSP was restarted; from the space centre, the launch works.
 
 - **Check the stall recovery of `drive_to`** on the lip of the runway deck: approaching a spot on the
   deck from the grass, the rover used to creep at its lowest speed against the lip until the 300 s limit.
