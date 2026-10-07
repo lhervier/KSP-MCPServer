@@ -28,7 +28,7 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS |
+| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS, the local time where it is and the length of its body's day |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -43,6 +43,8 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
 | `set_time` | sets the universal time of the game: the time of day at a spot |
+| `set_warp` | sets the time warp, on rails or in physics warp, as the `.` and `,` keys do, with Alt or without |
+| `warp_to` | warps to a universal time, as *Warp To* of a manoeuvre node or of the map view does |
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
 | `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |

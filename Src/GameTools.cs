@@ -16,9 +16,10 @@ namespace com.github.lhervier.ksp.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("get_state",
-                "Reads the game: scene, pause, universal time, and for the active vessel its id, name, situation, " +
-                "latitude, longitude, altitude, height above the terrain, surface speed, heading (degrees from " +
-                "north, towards east), brakes and SAS.",
+                "Reads the game: scene, pause, universal time, time warp rate, and for the active vessel its id, " +
+                "name, situation, latitude, longitude, altitude, height above the terrain, surface speed, heading " +
+                "(degrees from north, towards east), brakes, SAS, and the local time where it is (the fraction of " +
+                "its body's solar day, 0.5 at noon) with the length of that day in seconds.",
                 Schema.Object(), GetState);
             yield return new Tool("get_floating_origin",
                 "Reads KSP's floating origin, the point the world is kept centred on: the active vessel's " +
@@ -155,6 +156,23 @@ namespace com.github.lhervier.ksp.mcpserver
                 "day at a spot, for one. A flight reverted to its launch goes back to the time of the launch.",
                 Schema.Object(Schema.P("ut", "number", "seconds", true)),
                 SetTime);
+            yield return new Tool("set_warp",
+                "Sets the time warp in flight, as the . and , keys do, or Alt with them for physics warp: the rate " +
+                "is an index into KSP's rates, 0 for normal time. Waits until KSP has reached it. Fails when KSP " +
+                "allows a lower rate only (altitude, atmosphere, an engine firing, a vessel moving over the " +
+                "ground): it then stays at that rate, which the answer gives.",
+                Schema.Object(
+                    Schema.P("rate_index", "number",
+                        "0 for normal time; on rails, up to 7 (100000x with KSP's rates), in physics warp up to 3 (4x)", true),
+                    Schema.P("physics", "boolean", "physics warp, as Alt with the keys (default false: on rails)")),
+                SetWarp);
+            yield return new Tool("warp_to",
+                "Warps to a universal time, as Warp To of a manoeuvre node or of the map view does: KSP picks the " +
+                "rates on rails, slows down and stops at that time. Waits until it is back to normal time.",
+                Schema.Object(
+                    Schema.P("ut", "number", "the universal time to warp to, in seconds"),
+                    Schema.P("seconds", "number", "instead of ut: how long to warp for, in seconds of game time")),
+                WarpTo);
             yield return new Tool("set_ui",
                 "Hides or shows the game's interface in flight, as F2 does: navball, staging, toolbars. Windows " +
                 "of mods that do not follow it stay.",
@@ -293,12 +311,13 @@ namespace com.github.lhervier.ksp.mcpserver
                 // Without a planetarium, the time is the game's, and there is no game while KSP loads or on
                 // the main menu.
                 { "ut", Planetarium.fetch != null || HighLogic.CurrentGame != null
-                    ? Planetarium.GetUniversalTime() : double.NaN }
+                    ? Planetarium.GetUniversalTime() : double.NaN },
+                { "warpRate", (double)TimeWarp.CurrentRate }
             };
             Vessel v = HighLogic.LoadedSceneIsFlight ? FlightGlobals.ActiveVessel : null;
             if (v != null)
             {
-                state["vessel"] = new Dictionary<string, object>
+                Dictionary<string, object> vessel = new Dictionary<string, object>
                 {
                     { "id", v.id.ToString() },
                     { "name", v.vesselName },
@@ -314,6 +333,14 @@ namespace com.github.lhervier.ksp.mcpserver
                     { "brakes", v.ActionGroups[KSPActionGroup.Brakes] },
                     { "sas", v.ActionGroups[KSPActionGroup.SAS] }
                 };
+                // As the day and night switches of the space centre read it, which turn its lights on before
+                // 0.25 and after 0.7.
+                if (Sun.Instance != null)
+                {
+                    vessel["localTime"] = Sun.Instance.GetLocalTimeAtPosition(v.latitude, v.longitude, v.mainBody);
+                    vessel["solarDay"] = v.mainBody.solarDayLength;
+                }
+                state["vessel"] = vessel;
             }
             return state;
         }
@@ -1074,6 +1101,104 @@ namespace com.github.lhervier.ksp.mcpserver
             }
             Planetarium.SetUniversalTime(call.Number("ut"));
             yield return null;
+            call.Text(State());
+        }
+
+        // Private in TimeWarp: what Alt with the warp keys calls, and whether a Warp To is running.
+        private static readonly MethodInfo WarpSetMode = typeof(TimeWarp).GetMethod("setMode",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo WarpAutoEngaged = typeof(TimeWarp).GetField("autoWarpEngaged",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private static IEnumerator SetWarp(ToolCall call)
+        {
+            TimeWarp warp = TimeWarp.fetch;
+            if (!HighLogic.LoadedSceneIsFlight || warp == null || !FlightGlobals.ready)
+            {
+                call.Fail("Not in flight");
+                yield break;
+            }
+            bool physics = call.Bool("physics");
+            float[] rates = physics ? warp.physicsWarpRates : warp.warpRates;
+            double asked = call.Number("rate_index");
+            int index = (int)asked;
+            if (index != asked || index < 0 || index >= rates.Length)
+            {
+                call.Fail("rate_index: 0 to " + (rates.Length - 1));
+                yield break;
+            }
+
+            // The keys switch between rails and physics warp at the lowest rates only.
+            TimeWarp.Modes mode = physics ? TimeWarp.Modes.LOW : TimeWarp.Modes.HIGH;
+            if (warp.Mode != mode)
+            {
+                if (TimeWarp.CurrentRateIndex != 0)
+                {
+                    TimeWarp.SetRate(0, true);
+                    yield return null;
+                }
+                if (!(bool)WarpSetMode.Invoke(warp, new object[] { mode }))
+                {
+                    call.Fail("KSP did not switch to " + (physics ? "physics" : "rails") + " warp");
+                    yield break;
+                }
+            }
+
+            // KSP lowers the rate asked for to the one it allows, then reaches it gradually.
+            TimeWarp.SetRate(index, false);
+            float start = Time.realtimeSinceStartup;
+            do
+            {
+                yield return null;
+            }
+            while (TimeWarp.CurrentRate != warp.tgt_rate && Time.realtimeSinceStartup - start < 10f);
+
+            Dictionary<string, object> answer = new Dictionary<string, object>
+            {
+                { "physics", warp.Mode == TimeWarp.Modes.LOW },
+                { "rateIndex", TimeWarp.CurrentRateIndex },
+                { "rate", (double)TimeWarp.CurrentRate },
+                { "ut", Planetarium.GetUniversalTime() }
+            };
+            if (TimeWarp.CurrentRateIndex != index)
+            {
+                call.Fail("KSP allows a lower rate only here: " + Json.Write(answer));
+                yield break;
+            }
+            call.Text(answer);
+        }
+
+        private static IEnumerator WarpTo(ToolCall call)
+        {
+            TimeWarp warp = TimeWarp.fetch;
+            if (warp == null || Planetarium.fetch == null)
+            {
+                call.Fail("No time warp in this scene");
+                yield break;
+            }
+            double now = Planetarium.GetUniversalTime();
+            double ut = call.Has("ut") ? call.Number("ut") : now + call.Number("seconds");
+            if (double.IsNaN(ut) || ut <= now)
+            {
+                call.Fail("ut or seconds: a time ahead of the game's, which is " + now);
+                yield break;
+            }
+            warp.WarpTo(ut);
+
+            // KSP starts the warp at its next frame, and ends it once back to normal time; it gives up on its
+            // own when it cannot warp at all.
+            float start = Time.realtimeSinceStartup;
+            do
+            {
+                yield return null;
+                if (Time.realtimeSinceStartup - start > 600f)
+                {
+                    warp.CancelAutoWarp();
+                    call.Fail("Still warping after 10 minutes: stopped");
+                    yield break;
+                }
+            }
+            while (warp.setAutoWarp || (bool)WarpAutoEngaged.GetValue(warp));
             call.Text(State());
         }
 
