@@ -16,7 +16,7 @@ namespace com.github.lhervier.ksp.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("get_state",
-                "Reads the game: scene, pause, universal time, and for the active vessel its name, situation, " +
+                "Reads the game: scene, pause, universal time, and for the active vessel its id, name, situation, " +
                 "latitude, longitude, altitude, height above the terrain, surface speed, heading (degrees from " +
                 "north, towards east), brakes and SAS.",
                 Schema.Object(), GetState);
@@ -79,8 +79,10 @@ namespace com.github.lhervier.ksp.mcpserver
                 "whether it is the active vessel or its target, and its distance from the active vessel in metres.",
                 Schema.Object(), ListVessels);
             yield return new Tool("switch_vessel",
-                "Makes a loaded vessel the active one, as the switch vessel keys [ and ] do, and waits until " +
-                "physics runs on it.",
+                "Makes a vessel the active one, and waits until physics runs on it: a loaded vessel as the switch " +
+                "vessel keys [ and ] do; one that is not loaded, of the player's, as Switch To of the map view " +
+                "does: KSP saves the game as persistent and opens the flight again on it. Fails when KSP refuses " +
+                "the switch (the active vessel under acceleration, moving over the surface, in the atmosphere...).",
                 Schema.Object(
                     Schema.P("vessel", "string", "the vessel's id, or its name when no other vessel bears it", true)),
                 SwitchVessel);
@@ -258,6 +260,7 @@ namespace com.github.lhervier.ksp.mcpserver
             {
                 state["vessel"] = new Dictionary<string, object>
                 {
+                    { "id", v.id.ToString() },
                     { "name", v.vesselName },
                     { "situation", v.situation.ToString() },
                     { "packed", v.packed },
@@ -629,16 +632,18 @@ namespace com.github.lhervier.ksp.mcpserver
         }
 
         /// <summary>
-        /// Waits until a flight scene is up with an active vessel other than <paramref name="previous"/>, and
-        /// physics runs on it; then answers with the state of the game, or fails after three minutes.
+        /// Waits until a flight scene is up with an active vessel other than <paramref name="previous"/>, the
+        /// one whose id is <paramref name="id"/> when it is given, and physics runs on it; then answers with the
+        /// state of the game, or fails after three minutes.
         /// </summary>
-        private static IEnumerator WaitForNewActiveVessel(ToolCall call, Vessel previous)
+        private static IEnumerator WaitForNewActiveVessel(ToolCall call, Vessel previous, Guid? id = null)
         {
             // The scene changes a few frames later: the vessel of the scene being left must not count. A
             // vessel destroyed with its scene compares equal to null, and so differs from the new one.
             float start = Time.realtimeSinceStartup;
             while (!(HighLogic.LoadedSceneIsFlight && FlightGlobals.ready && FlightGlobals.ActiveVessel != null
-                     && FlightGlobals.ActiveVessel != previous && !FlightGlobals.ActiveVessel.packed))
+                     && FlightGlobals.ActiveVessel != previous && !FlightGlobals.ActiveVessel.packed
+                     && (id == null || FlightGlobals.ActiveVessel.id == id.Value)))
             {
                 if (Time.realtimeSinceStartup - start > 180f)
                 {
@@ -692,14 +697,39 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail(error);
                 yield break;
             }
-            if (!vessel.loaded)
+            if (vessel == FlightGlobals.ActiveVessel)
             {
-                call.Fail(vessel.vesselName + " is not loaded: only a vessel within loading range can be switched to");
+                call.Text(State());
                 yield break;
             }
-            if (vessel != FlightGlobals.ActiveVessel)
+            if (!vessel.loaded)
             {
-                FlightGlobals.SetActiveVessel(vessel);
+                // What Switch To of the map view does (MapContextMenuOptions.FocusObject): only for a vessel of
+                // the player's, and only if the game lets the player switch to a vessel far away.
+                if (vessel.DiscoveryInfo.Level != DiscoveryLevels.Owned)
+                {
+                    call.Fail(vessel.vesselName + " is not the player's: the map view does not switch to it");
+                    yield break;
+                }
+                if (!HighLogic.CurrentGame.Parameters.Flight.CanSwitchVesselsFar)
+                {
+                    call.Fail("This game does not let the player switch to a vessel far away");
+                    yield break;
+                }
+            }
+            // Read before the switch: KSP refuses it for these reasons only, with a message on the screen.
+            ClearToSaveStatus clear = FlightGlobals.ClearToSave();
+            if (!FlightGlobals.SetActiveVessel(vessel))
+            {
+                call.Fail("KSP refused to switch to " + vessel.vesselName + ": " + clear);
+                yield break;
+            }
+            if (!vessel.loaded)
+            {
+                // KSP saves the game as persistent and opens the flight again on that vessel: a new scene, with
+                // a new Vessel object, found by its id.
+                yield return WaitForNewActiveVessel(call, null, vessel.id);
+                yield break;
             }
             float start = Time.realtimeSinceStartup;
             while (FlightGlobals.ActiveVessel != vessel || vessel.packed)

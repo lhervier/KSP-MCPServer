@@ -28,7 +28,7 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, and the active vessel: situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS |
+| `get_state` | the scene, the pause, the time, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty |
@@ -37,7 +37,7 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `save_game` | saves the game as it is now under a name, as a quicksave does |
 | `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does |
 | `list_vessels` | the vessels of the game: id, name, situation, loaded or not, packed or not, active or target, distance from the active vessel |
-| `switch_vessel` | makes a loaded vessel the active one, as the switch vessel keys `[` and `]` do |
+| `switch_vessel` | makes a vessel the active one: a loaded one as the switch vessel keys `[` and `]` do, one far away as *Switch To* of the map view does |
 | `set_target` | sets the active vessel's target to another vessel, or clears it |
 | `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
