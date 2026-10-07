@@ -31,11 +31,11 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `get_state` | the scene, the pause, the time, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in |
-| `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty |
+| `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
 | `play_mission` | starts a mission of Making History from the main menu, from its start, as *Play Missions* does: in the scene the mission starts in |
 | `load_save` | loads a save into flight, from any scene |
 | `save_game` | saves the game as it is now under a name, as a quicksave does |
-| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does |
+| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does; refuses a craft with parts not yet unlocked, or too heavy, too large or of too many parts for the level of its site and its editor |
 | `list_vessels` | the vessels of the game: id, name, situation, loaded or not, packed or not, active or target, distance from the active vessel |
 | `switch_vessel` | makes a vessel the active one: a loaded one as the switch vessel keys `[` and `]` do, one far away as *Switch To* of the map view does |
 | `set_target` | sets the active vessel's target to another vessel, or clears it |
@@ -55,7 +55,8 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `go_to_scene` | leaves for the space centre, the tracking station or the main menu, saving the game first as the game's own buttons do |
 | `fly_vessel` | flies a vessel of the player's from the tracking station, as its *Fly* button does |
 | `open_facility` | clicks a building of the space centre: its editor, its scene or its screen opens |
-| `close_screen` | closes what is open over the scene, as its own button does: a dialog, the recovery report, a building's screen |
+| `facility_menu` | opens a building's menu at the space centre, as a right click does, and reads it: level, damage, costs, funds; presses its *Upgrade* or *Repair* button and waits until KSP is done |
+| `close_screen` | closes what is open over the scene, as its own button does: a dialog, the flight results after a crash, a building's menu, the recovery report, a building's screen |
 | `quit_game` | quits KSP, a second after answering |
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |

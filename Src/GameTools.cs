@@ -43,11 +43,46 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool("new_game",
                 "Starts a new game from the main menu, as New Game does with the Normal difficulty and the " +
                 "default flag: in saves/<folder>, opening at the space centre. Waits until the space centre is " +
-                "up. Refuses a folder that already holds a game.",
+                "up. Refuses a folder that already holds a game. Some settings of the Custom difficulty can be " +
+                "changed, as its sliders and switches do, within their range.",
                 Schema.Object(
                     Schema.P("folder", "string", "the new game's folder under saves/, also its name", true),
-                    Schema.P("mode", "string", "CAREER, SCIENCE_SANDBOX or SANDBOX (default CAREER)")),
+                    Schema.P("mode", "string", "CAREER, SCIENCE_SANDBOX or SANDBOX (default CAREER)"),
+                    Schema.P("starting_funds", "number",
+                        "a career's starting funds, 0 to 500000 in steps of 1000 (default 25000, Normal's)"),
+                    Schema.P("funds_penalties", "number",
+                        "a career's funds penalties in percent, which the costs of building upgrades and repairs " +
+                        "are multiplied by: 10 to 1000 in steps of 10 (default 100, Normal's)"),
+                    Schema.P("starting_science", "number",
+                        "the starting science of a career or a science game, 0 to 5000 in steps of 10 (default 0)"),
+                    Schema.P("bypass_entry_purchase", "boolean",
+                        "whether the parts of a technology are bought as soon as it is researched, as the switch " +
+                        "Bypass Entry Purchase After Research does (default false, Normal's)"),
+                    Schema.P("building_damage", "number",
+                        "the building impact damage multiplier, which the damage a crash does to a building of " +
+                        "the space centre is multiplied by: 0.01 to 1 (default 0.05, Normal's)")),
                 NewGame);
+            yield return new Tool("research_tech",
+                "Researches a node of the technology tree, as its Research button in the Research and " +
+                "Development screen does: needs that screen open (open_facility RnD), the node researchable (its " +
+                "parents researched) and the science it costs. Answers with the science left.",
+                Schema.Object(
+                    Schema.P("node", "string", "the node's id, as in the tech tree: basicRocketry, generalConstruction...", true)),
+                ResearchTech);
+            yield return new Tool("facility_menu",
+                "Opens the menu of a building of the space centre, as a right click on it does, and reads it: the " +
+                "building's level and its number of levels, its damage in percent, the cost of its next upgrade " +
+                "and of its repairs, the funds, and the buttons that can be pressed. With a button, presses it as " +
+                "the left mouse button does and waits until KSP is done: Upgrade until the new level is built, " +
+                "Repair until the repairs are over; then answers with the building as it is. Without, leaves the " +
+                "menu open, for a screenshot; close_screen closes it. Fails when the button cannot be pressed, " +
+                "and when KSP asks for a confirmation (a vessel standing at the building).",
+                Schema.Object(
+                    Schema.P("facility", "string",
+                        "the building's facility name, as KSP names it: LaunchPad, Runway, VAB, SPH, " +
+                        "TrackingStation, AstronautComplex, RnD, MissionControl, Administration", true),
+                    Schema.P("button", "string", "Upgrade or Repair; left out, the menu stays open")),
+                FacilityMenu);
             yield return new Tool("play_mission",
                 "Starts a mission of Making History from the main menu, from its start, as Play Missions does: " +
                 "the mission's own game is set up, its launch sites placed, and the game opens in the scene the " +
@@ -67,7 +102,9 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool("launch_vessel",
                 "Launches a vessel from its .craft file at a launch site, as the editor's Launch button does, with " +
                 "the crew the editor would give it by default, and waits until physics runs on it. KSP saves the " +
-                "game as 'persistent' first, as it does for any launch. Needs a game loaded.",
+                "game as 'persistent' first, as it does for any launch. Needs a game loaded. Refuses a craft " +
+                "whose parts are not all unlocked in this game, where the launch dialog of the space centre asks " +
+                "for a confirmation.",
                 Schema.Object(
                     Schema.P("craft", "string",
                         "the .craft file: absolute, or relative to the Ships folder of the game being played " +
@@ -215,10 +252,13 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool("close_screen",
                 "Closes one thing open over the scene, as its own button does, the topmost first: a dialog " +
                 "(its button pressed when it has a single one, such as the guide's of a new career; otherwise " +
-                "closed as Escape does), then, at the space centre, the recovery report, then the screen of a " +
-                "building. Answers with what it closed: closed is nothing when nothing was open.",
+                "closed as Escape does), then the flight results shown after a crash, then, at the space centre, " +
+                "the menu of a building (as a click beside it " +
+                "does), the recovery report, then the screen of a building. Answers with what it closed: closed " +
+                "is nothing when nothing was open.",
                 Schema.Object(
-                    Schema.P("dialogs_only", "boolean", "close a dialog only, never a report or a screen (default false)")),
+                    Schema.P("dialogs_only", "boolean",
+                        "close a dialog only, never a menu, a report or a screen (default false)")),
                 CloseScreen);
             yield return new Tool("quit_game",
                 "Quits KSP, a second after answering, so that the answer gets back first.",
@@ -423,6 +463,60 @@ namespace com.github.lhervier.ksp.mcpserver
             MainMenu menu = UnityEngine.Object.FindObjectOfType<MainMenu>();
             string flag = menu != null && !string.IsNullOrEmpty(menu.DefaultFlagURL) ? menu.DefaultFlagURL : "Squad/Flags/default";
             GameParameters parameters = GameParameters.GetDefaultParameters(mode, GameParameters.Preset.Normal);
+
+            // What the sliders and switches of the Custom difficulty write, within their range and steps.
+            if (call.Has("building_damage"))
+            {
+                double damage = call.Number("building_damage");
+                if (!(damage >= 0.01 && damage <= 1.0))
+                {
+                    call.Fail("building_damage: 0.01 to 1");
+                    yield break;
+                }
+                parameters.preset = GameParameters.Preset.Custom;
+                parameters.CustomParams<GameParameters.AdvancedParams>().BuildingImpactDamageMult = (float)damage;
+            }
+            if (call.Has("starting_science") || call.Has("bypass_entry_purchase"))
+            {
+                if (mode == Game.Modes.SANDBOX)
+                {
+                    call.Fail("A sandbox has neither science nor parts to buy");
+                    yield break;
+                }
+                double science = call.Number("starting_science", parameters.Career.StartingScience);
+                if (science < 0.0 || science > 5000.0 || Math.Abs(science / 10.0 - Math.Round(science / 10.0)) > 1e-9)
+                {
+                    call.Fail("starting_science: 0 to 5000, in steps of 10");
+                    yield break;
+                }
+                parameters.preset = GameParameters.Preset.Custom;
+                parameters.Career.StartingScience = (float)science;
+                parameters.Difficulty.BypassEntryPurchaseAfterResearch = call.Bool("bypass_entry_purchase",
+                    parameters.Difficulty.BypassEntryPurchaseAfterResearch);
+            }
+            if (call.Has("starting_funds") || call.Has("funds_penalties"))
+            {
+                if (mode != Game.Modes.CAREER)
+                {
+                    call.Fail("Only a career has funds");
+                    yield break;
+                }
+                double funds = call.Number("starting_funds", parameters.Career.StartingFunds);
+                double penalties = call.Number("funds_penalties", parameters.Career.FundsLossMultiplier * 100.0);
+                if (funds < 0.0 || funds > 500000.0 || Math.Abs(funds / 1000.0 - Math.Round(funds / 1000.0)) > 1e-9)
+                {
+                    call.Fail("starting_funds: 0 to 500000, in steps of 1000");
+                    yield break;
+                }
+                if (penalties < 10.0 || penalties > 1000.0 || Math.Abs(penalties / 10.0 - Math.Round(penalties / 10.0)) > 1e-9)
+                {
+                    call.Fail("funds_penalties: 10 to 1000, in steps of 10");
+                    yield break;
+                }
+                parameters.preset = GameParameters.Preset.Custom;
+                parameters.Career.StartingFunds = (float)funds;
+                parameters.Career.FundsLossMultiplier = (float)(penalties / 100.0);
+            }
             SceneWatch watch = new SceneWatch(GameScenes.SPACECENTER);
             GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
             HighLogic.CurrentGame = GamePersistence.CreateNewGame(folder, mode, parameters, flag,
@@ -624,6 +718,21 @@ namespace com.github.lhervier.ksp.mcpserver
                 yield break;
             }
 
+            // What the launch dialog of the space centre reads of the craft. Where it asks for a confirmation
+            // before launching a craft whose parts are not all unlocked, this refuses.
+            KSP.UI.Screens.CraftProfileInfo profile = new KSP.UI.Screens.CraftProfileInfo().LoadDetailsFromCraftFile(craft, path);
+            if (!profile.shipPartsUnlocked || !profile.shipPartModulesAvailable)
+            {
+                call.Fail("The craft cannot be launched as it is in this game: " + profile.GetErrorMessage());
+                yield break;
+            }
+            string limits = LaunchLimitsBroken(profile, call.String("site", "Runway"));
+            if (limits != null)
+            {
+                call.Fail("The editor would not launch this craft: " + limits);
+                yield break;
+            }
+
             // The crew the editor proposes for that craft, without hiring anyone.
             VesselCrewManifest crew = HighLogic.CurrentGame.CrewRoster.DefaultCrewForVessel(craft, null, false);
             Vessel previous = FlightGlobals.ActiveVessel;
@@ -653,6 +762,54 @@ namespace com.github.lhervier.ksp.mcpserver
                 yield return null;
             }
             call.Text(State());
+        }
+
+        /// <summary>
+        /// Why the editor's Launch button would refuse a craft at a launch site of the space centre — too heavy or
+        /// too large for the site's level, too many parts for its editor's — or null when it would not. Sites other
+        /// than the launchpad and the runway are not checked.
+        /// </summary>
+        private static string LaunchLimitsBroken(KSP.UI.Screens.CraftProfileInfo profile, string site)
+        {
+            SpaceCenterFacility facility;
+            if (string.Equals(site, "LaunchPad", StringComparison.OrdinalIgnoreCase))
+            {
+                facility = SpaceCenterFacility.LaunchPad;
+            }
+            else if (string.Equals(site, "Runway", StringComparison.OrdinalIgnoreCase))
+            {
+                facility = SpaceCenterFacility.Runway;
+            }
+            else
+            {
+                return null;
+            }
+            bool isPad = facility == SpaceCenterFacility.LaunchPad;
+            bool isVAB = profile.shipFacility != EditorFacility.SPH;
+            float siteLevel = ScenarioUpgradeableFacilities.GetFacilityLevel(facility);
+            float editorLevel = ScenarioUpgradeableFacilities.GetFacilityLevel(
+                isVAB ? SpaceCenterFacility.VehicleAssemblyBuilding : SpaceCenterFacility.SpaceplaneHangar);
+
+            // The tests of the editor, with the limits it reads.
+            PreFlightTests.IPreFlightTest[] tests =
+            {
+                new PreFlightTests.CraftWithinMassLimits(profile.totalMass, profile.shipName, facility,
+                    GameVariables.Instance.GetCraftMassLimit(siteLevel, isPad)),
+                new PreFlightTests.CraftWithinSizeLimits(profile.shipSize, profile.shipName, facility,
+                    GameVariables.Instance.GetCraftSizeLimit(siteLevel, isPad)),
+                new PreFlightTests.CraftWithinPartCountLimit(profile.partCount,
+                    isVAB ? SpaceCenterFacility.VehicleAssemblyBuilding : SpaceCenterFacility.SpaceplaneHangar,
+                    GameVariables.Instance.GetPartCountLimit(editorLevel, isVAB))
+            };
+            List<string> broken = new List<string>();
+            foreach (PreFlightTests.IPreFlightTest test in tests)
+            {
+                if (!test.Test())
+                {
+                    broken.Add(test.GetWarningTitle() + ": " + test.GetWarningDescription());
+                }
+            }
+            return broken.Count > 0 ? string.Join("; ", broken.ToArray()) : null;
         }
 
         private static IEnumerator ListVessels(ToolCall call)
@@ -1172,6 +1329,8 @@ namespace com.github.lhervier.ksp.mcpserver
             }
             Vessel previous = FlightGlobals.ActiveVessel;
             FlightDriver.RevertToLaunch();
+            // What the buttons of the flight results dialog do after theirs, the dialog being up after a crash.
+            KSP.UI.Dialogs.FlightResultsDialog.Close();
             yield return WaitForNewActiveVessel(call, previous);
         }
 
@@ -1202,6 +1361,8 @@ namespace com.github.lhervier.ksp.mcpserver
             SceneWatch watch = new SceneWatch(GameScenes.EDITOR);
             GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
             FlightDriver.RevertToPrelaunch(facility);
+            // What the buttons of the flight results dialog do after theirs, the dialog being up after a crash.
+            KSP.UI.Dialogs.FlightResultsDialog.Close();
             yield return WaitForScene(call, watch);
             if (!call.IsError)
             {
@@ -1299,6 +1460,8 @@ namespace com.github.lhervier.ksp.mcpserver
             GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
             GamePersistence.SaveGame("persistent", HighLogic.SaveFolder, SaveMode.OVERWRITE);
             HighLogic.LoadScene(scene);
+            // What the buttons of the flight results dialog do after theirs, the dialog being up after a crash.
+            KSP.UI.Dialogs.FlightResultsDialog.Close();
             yield return WaitForScene(call, watch);
             if (!call.IsError)
             {
@@ -1338,21 +1501,9 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail("Buildings open from the space centre, and the game is in " + HighLogic.LoadedScene);
                 yield break;
             }
-            string name = call.String("facility") ?? "";
-            SpaceCenterBuilding building = null;
-            List<string> names = new List<string>();
-            foreach (SpaceCenterBuilding b in UnityEngine.Object.FindObjectsOfType<SpaceCenterBuilding>())
-            {
-                names.Add(b.facilityName);
-                if (string.Equals(b.facilityName, name, StringComparison.OrdinalIgnoreCase))
-                {
-                    building = b;
-                }
-            }
+            SpaceCenterBuilding building = FindBuilding(call);
             if (building == null)
             {
-                names.Sort(StringComparer.Ordinal);
-                call.Fail("No building " + name + " at the space centre; there are: " + string.Join(", ", names.ToArray()));
                 yield break;
             }
 
@@ -1385,6 +1536,248 @@ namespace com.github.lhervier.ksp.mcpserver
             }
         }
 
+        /// <summary>
+        /// The building of the space centre named by the facility argument, or null after failing the call with
+        /// the names of those there are.
+        /// </summary>
+        private static SpaceCenterBuilding FindBuilding(ToolCall call)
+        {
+            string name = call.String("facility") ?? "";
+            SpaceCenterBuilding building = null;
+            List<string> names = new List<string>();
+            foreach (SpaceCenterBuilding b in UnityEngine.Object.FindObjectsOfType<SpaceCenterBuilding>())
+            {
+                names.Add(b.facilityName);
+                if (string.Equals(b.facilityName, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    building = b;
+                }
+            }
+            if (building == null)
+            {
+                names.Sort(StringComparer.Ordinal);
+                call.Fail("No building " + name + " at the space centre; there are: " + string.Join(", ", names.ToArray()));
+            }
+            return building;
+        }
+
+        private static IEnumerator ResearchTech(ToolCall call)
+        {
+            KSP.UI.Screens.RDController controller = KSP.UI.Screens.RDController.Instance;
+            if (controller == null || ResearchAndDevelopment.Instance == null)
+            {
+                call.Fail("The Research and Development screen is not open (open_facility RnD)");
+                yield break;
+            }
+            string id = call.String("node") ?? "";
+            KSP.UI.Screens.RDNode node = null;
+            foreach (KSP.UI.Screens.RDNode n in controller.nodes)
+            {
+                if (n != null && n.tech != null && n.tech.techID == id)
+                {
+                    node = n;
+                }
+            }
+            if (node == null)
+            {
+                call.Fail("No node " + id + " in the tech tree");
+                yield break;
+            }
+            if (node.IsResearched)
+            {
+                call.Fail("The node " + id + " is already researched");
+                yield break;
+            }
+
+            // The screen only offers its Research button on a node whose parents allow it.
+            if (node.state != KSP.UI.Screens.RDNode.State.RESEARCHABLE)
+            {
+                call.Fail("The node " + id + " cannot be researched yet: its parents are not researched");
+                yield break;
+            }
+            RDTech.OperationResult result = node.tech.ResearchTech();
+            controller.techTree.RefreshUI();
+            yield return null;
+            if (result != RDTech.OperationResult.Successful)
+            {
+                call.Fail("KSP refused to research " + id + ": " + result + " (" + node.tech.scienceCost +
+                    " science, " + ResearchAndDevelopment.Instance.Science + " available)");
+                yield break;
+            }
+            call.Text(new Dictionary<string, object>
+            {
+                { "node", id },
+                { "cost", node.tech.scienceCost },
+                { "science", (double)ResearchAndDevelopment.Instance.Science }
+            });
+        }
+
+        private static IEnumerator FacilityMenu(ToolCall call)
+        {
+            if (HighLogic.LoadedScene != GameScenes.SPACECENTER)
+            {
+                call.Fail("Building menus open at the space centre, and the game is in " + HighLogic.LoadedScene);
+                yield break;
+            }
+            string buttonName = call.String("button");
+            string field;
+            switch ((buttonName ?? "").ToUpperInvariant())
+            {
+                case "":
+                    field = null;
+                    break;
+                case "UPGRADE":
+                    field = "UpgradeButton";
+                    break;
+                case "REPAIR":
+                    field = "RepairButton";
+                    break;
+                default:
+                    call.Fail("button: Upgrade or Repair");
+                    yield break;
+            }
+            SpaceCenterBuilding building = FindBuilding(call);
+            if (building == null)
+            {
+                yield break;
+            }
+
+            // Only one menu at a time, as the game shows; the one of this building is opened anew.
+            foreach (KSP.UI.Screens.KSCFacilityContextMenu open in UnityEngine.Object.FindObjectsOfType<KSP.UI.Screens.KSCFacilityContextMenu>())
+            {
+                open.Dismiss(KSP.UI.Screens.KSCFacilityContextMenu.DismissAction.None);
+            }
+            yield return null;
+            building.OnRightClick();
+
+            // The menu sets its buttons up once started, and their text and state as it is drawn.
+            yield return new WaitForSecondsRealtime(0.5f);
+            KSP.UI.Screens.KSCFacilityContextMenu menu = UnityEngine.Object.FindObjectOfType<KSP.UI.Screens.KSCFacilityContextMenu>();
+            if (menu == null)
+            {
+                call.Fail("The menu of " + building.facilityName + " did not open");
+                yield break;
+            }
+            if (field == null)
+            {
+                call.Text(FacilityState(building, menu));
+                yield break;
+            }
+            UnityEngine.UI.Button button = MenuButton(menu, field);
+            if (button == null || !button.gameObject.activeInHierarchy || !button.interactable)
+            {
+                Dictionary<string, object> state = FacilityState(building, menu);
+                menu.Dismiss(KSP.UI.Screens.KSCFacilityContextMenu.DismissAction.None);
+                call.Fail("The " + buttonName + " button of " + building.facilityName + " cannot be pressed; the menu " +
+                    "reads: " + Json.Write(state));
+                yield break;
+            }
+
+            // Watched from before the click: an upgrade may be built a few frames after it.
+            FacilityWatch watch = new FacilityWatch();
+            GameEvents.OnKSCFacilityUpgraded.Add(watch.OnUpgraded);
+            try
+            {
+                button.onClick.Invoke();
+                yield return null;
+                yield return null;
+                PopupDialog[] dialogs = UnityEngine.Object.FindObjectsOfType<PopupDialog>();
+                if (dialogs.Length > 0)
+                {
+                    PopupDialog dialog = dialogs[dialogs.Length - 1];
+                    call.Fail("KSP asks for a confirmation, left open: " +
+                        (dialog.dialogToDisplay != null ? dialog.dialogToDisplay.name : "a dialog"));
+                    yield break;
+                }
+                float start = Time.realtimeSinceStartup;
+                while (field == "UpgradeButton" ? !watch.Upgraded : building.GetStructureDamage() > 0f)
+                {
+                    if (Time.realtimeSinceStartup - start > 120f)
+                    {
+                        call.Fail(buttonName + " of " + building.facilityName + " was not over after 2 minutes");
+                        yield break;
+                    }
+                    yield return null;
+                }
+            }
+            finally
+            {
+                GameEvents.OnKSCFacilityUpgraded.Remove(watch.OnUpgraded);
+            }
+
+            // The building as its menu reads now, the menu closed again as the click left it.
+            yield return new WaitForSecondsRealtime(1f);
+            building.OnRightClick();
+            yield return new WaitForSecondsRealtime(0.5f);
+            menu = UnityEngine.Object.FindObjectOfType<KSP.UI.Screens.KSCFacilityContextMenu>();
+            Dictionary<string, object> after = FacilityState(building, menu);
+            if (menu != null)
+            {
+                menu.Dismiss(KSP.UI.Screens.KSCFacilityContextMenu.DismissAction.None);
+            }
+            call.Text(after);
+        }
+
+        /// <summary>A button of a building's menu, by the name of its field, or null.</summary>
+        private static UnityEngine.UI.Button MenuButton(KSP.UI.Screens.KSCFacilityContextMenu menu, string field)
+        {
+            FieldInfo info = typeof(KSP.UI.Screens.KSCFacilityContextMenu).GetField(field,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            return info != null ? info.GetValue(menu) as UnityEngine.UI.Button : null;
+        }
+
+        /// <summary>
+        /// What the menu of a building reads, as a dictionary ready to be written as JSON: its level counted from
+        /// 1 as the menu counts it, its number of levels, its damage, the costs, the funds, and the buttons of
+        /// <paramref name="menu"/> that can be pressed.
+        /// </summary>
+        private static Dictionary<string, object> FacilityState(SpaceCenterBuilding building,
+            KSP.UI.Screens.KSCFacilityContextMenu menu)
+        {
+            Dictionary<string, object> state = new Dictionary<string, object>
+            {
+                { "facility", building.facilityName },
+                { "damage", (double)building.GetStructureDamage() },
+                { "repairCost", (double)building.GetRepairsCost() },
+                { "funds", Funding.Instance != null ? Funding.Instance.Funds : double.NaN }
+            };
+            if (building.Facility != null)
+            {
+                state["level"] = building.Facility.FacilityLevel + 1;
+                state["levels"] = building.Facility.MaxLevel + 1;
+                state["upgradeCost"] = (double)building.Facility.GetUpgradeCost();
+            }
+            if (menu != null)
+            {
+                List<object> buttons = new List<object>();
+                foreach (KeyValuePair<string, string> pair in new[]
+                {
+                    new KeyValuePair<string, string>("Upgrade", "UpgradeButton"),
+                    new KeyValuePair<string, string>("Repair", "RepairButton")
+                })
+                {
+                    UnityEngine.UI.Button button = MenuButton(menu, pair.Value);
+                    if (button != null && button.gameObject.activeInHierarchy && button.interactable)
+                    {
+                        buttons.Add(pair.Key);
+                    }
+                }
+                state["buttons"] = buttons;
+            }
+            return state;
+        }
+
+        /// <summary>Whether a building's new level has been built since the watch was made.</summary>
+        private sealed class FacilityWatch
+        {
+            public bool Upgraded;
+
+            public void OnUpgraded(Upgradeables.UpgradeableFacility facility, int level)
+            {
+                Upgraded = true;
+            }
+        }
+
         private static IEnumerator CloseScreen(ToolCall call)
         {
             Dictionary<string, object> answer = new Dictionary<string, object> { { "closed", "nothing" } };
@@ -1393,6 +1786,8 @@ namespace com.github.lhervier.ksp.mcpserver
                 ? UnityEngine.Object.FindObjectOfType<KSP.UI.Screens.MissionRecoveryDialog>() : null;
             KSP.UI.Screens.UISpaceCenter ui = HighLogic.LoadedScene == GameScenes.SPACECENTER
                 ? KSP.UI.Screens.UISpaceCenter.Instance : null;
+            KSP.UI.Screens.KSCFacilityContextMenu menu = HighLogic.LoadedScene == GameScenes.SPACECENTER
+                ? UnityEngine.Object.FindObjectOfType<KSP.UI.Screens.KSCFacilityContextMenu>() : null;
             bool dialogsOnly = call.Bool("dialogs_only");
             if (dialogs.Length > 0)
             {
@@ -1423,6 +1818,19 @@ namespace com.github.lhervier.ksp.mcpserver
                 {
                     dialog.Dismiss();
                 }
+            }
+            else if (KSP.UI.Dialogs.FlightResultsDialog.isDisplaying)
+            {
+                // What its Close button does.
+                KSP.UI.Dialogs.FlightResultsDialog.Close();
+                answer["closed"] = "flight results";
+            }
+            else if (menu != null && !dialogsOnly)
+            {
+                // What a click beside it does.
+                answer["closed"] = "menu";
+                answer["menu"] = menu.name;
+                menu.Dismiss(KSP.UI.Screens.KSCFacilityContextMenu.DismissAction.None);
             }
             else if (report != null && !dialogsOnly)
             {
