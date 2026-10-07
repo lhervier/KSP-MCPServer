@@ -40,6 +40,14 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("folder", "string", "the game's folder under saves/", true),
                     Schema.P("save", "string", "the save's name, without .sfs (default persistent)")),
                 OpenGame);
+            yield return new Tool("new_game",
+                "Starts a new game from the main menu, as New Game does with the Normal difficulty and the " +
+                "default flag: in saves/<folder>, opening at the space centre. Waits until the space centre is " +
+                "up. Refuses a folder that already holds a game.",
+                Schema.Object(
+                    Schema.P("folder", "string", "the new game's folder under saves/, also its name", true),
+                    Schema.P("mode", "string", "CAREER, SCIENCE_SANDBOX or SANDBOX (default CAREER)")),
+                NewGame);
             yield return new Tool("play_mission",
                 "Starts a mission of Making History from the main menu, from its start, as Play Missions does: " +
                 "the mission's own game is set up, its launch sites placed, and the game opens in the scene the " +
@@ -166,12 +174,50 @@ namespace com.github.lhervier.ksp.mcpserver
                 "Reverts the flight to its launch, as Revert to Launch does, and waits until physics runs on " +
                 "the vessel again.",
                 Schema.Object(), RevertToLaunch);
-            yield return new Tool("go_to_scene",
-                "Leaves the flight, or the scene the game is in, for the space centre or the tracking station, " +
-                "saving the game as persistent first as the game's own buttons do, and waits until that scene is up.",
+            yield return new Tool("revert_to_editor",
+                "Reverts the flight to the editor it was launched from, as Revert to Vehicle Assembly Building " +
+                "or Revert to Space Plane Hangar does, and waits until the editor is up.",
                 Schema.Object(
-                    Schema.P("scene", "string", "SPACECENTER or TRACKSTATION", true)),
+                    Schema.P("facility", "string", "VAB or SPH (default VAB)")),
+                RevertToEditor);
+            yield return new Tool("recover_vessel",
+                "Recovers the active vessel, as the Recover button above the altimeter does: KSP saves the game, " +
+                "goes to the space centre and recovers the vessel there. Waits until the recovery report is up, " +
+                "and answers with the place and the share of the value it gives (location, factor).",
+                Schema.Object(), RecoverVessel);
+            yield return new Tool("go_to_scene",
+                "Leaves the flight, or the scene the game is in, for the space centre, the tracking station or " +
+                "the main menu, saving the game as persistent first as the game's own buttons do, and waits until " +
+                "that scene is up.",
+                Schema.Object(
+                    Schema.P("scene", "string", "SPACECENTER, TRACKSTATION or MAINMENU", true)),
                 GoToScene);
+            yield return new Tool("fly_vessel",
+                "Flies a vessel from the tracking station, as its Fly button does: KSP saves the game as " +
+                "persistent and opens the flight on that vessel. Waits until physics runs on it. Only a vessel " +
+                "the player owns, not an asteroid.",
+                Schema.Object(
+                    Schema.P("vessel", "string", "the vessel's id, or its name when no other vessel bears it", true)),
+                FlyVessel);
+            yield return new Tool("open_facility",
+                "Clicks a building of the space centre, as the left mouse button does: the Vehicle Assembly " +
+                "Building and the Space Plane Hangar open their editor, the Tracking Station its scene, the other " +
+                "buildings their screen over the space centre, or the dialog KSP shows when it is closed in this " +
+                "game. Waits until the scene it opens is up, or a second for a screen. Answers with the scene " +
+                "the game is in.",
+                Schema.Object(
+                    Schema.P("facility", "string",
+                        "the building's facility name, as KSP names it: VAB, SPH, TrackingStation, " +
+                        "AstronautComplex, RnD, MissionControl, Administration, LaunchPad, Runway, FlagPole", true)),
+                OpenFacility);
+            yield return new Tool("close_screen",
+                "Closes one thing open over the scene, as its own button does, the topmost first: a dialog " +
+                "(its button pressed when it has a single one, such as the guide's of a new career; otherwise " +
+                "closed as Escape does), then, at the space centre, the recovery report, then the screen of a " +
+                "building. Answers with what it closed: closed is nothing when nothing was open.",
+                Schema.Object(
+                    Schema.P("dialogs_only", "boolean", "close a dialog only, never a report or a screen (default false)")),
+                CloseScreen);
             yield return new Tool("quit_game",
                 "Quits KSP, a second after answering, so that the answer gets back first.",
                 Schema.Object(), QuitGame);
@@ -337,6 +383,56 @@ namespace com.github.lhervier.ksp.mcpserver
             call.Text(State());
         }
 
+        private static IEnumerator NewGame(ToolCall call)
+        {
+            if (HighLogic.LoadedScene != GameScenes.MAINMENU)
+            {
+                call.Fail("New games start from the main menu, and the game is in " + HighLogic.LoadedScene);
+                yield break;
+            }
+            string folder = call.String("folder");
+            Game.Modes mode;
+            switch ((call.String("mode") ?? "CAREER").ToUpperInvariant())
+            {
+                case "CAREER":
+                    mode = Game.Modes.CAREER;
+                    break;
+                case "SCIENCE_SANDBOX":
+                    mode = Game.Modes.SCIENCE_SANDBOX;
+                    break;
+                case "SANDBOX":
+                    mode = Game.Modes.SANDBOX;
+                    break;
+                default:
+                    call.Fail("mode: CAREER, SCIENCE_SANDBOX or SANDBOX");
+                    yield break;
+            }
+            string persistent = Path.Combine(Path.Combine(Path.Combine(KSPUtil.ApplicationRootPath, "saves"), folder),
+                "persistent.sfs");
+            if (File.Exists(persistent))
+            {
+                call.Fail("saves/" + folder + " already holds a game");
+                yield break;
+            }
+
+            // What the main menu does once New Game is confirmed: the flag it proposes, the parameters of the
+            // difficulty it selects first.
+            MainMenu menu = UnityEngine.Object.FindObjectOfType<MainMenu>();
+            string flag = menu != null && !string.IsNullOrEmpty(menu.DefaultFlagURL) ? menu.DefaultFlagURL : "Squad/Flags/default";
+            GameParameters parameters = GameParameters.GetDefaultParameters(mode, GameParameters.Preset.Normal);
+            SceneWatch watch = new SceneWatch(GameScenes.SPACECENTER);
+            GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
+            HighLogic.CurrentGame = GamePersistence.CreateNewGame(folder, mode, parameters, flag,
+                GameScenes.SPACECENTER, EditorFacility.None);
+            GameEvents.onGameNewStart.Fire();
+            HighLogic.CurrentGame.Start();
+            yield return WaitForScene(call, watch);
+            if (!call.IsError)
+            {
+                call.Text(State());
+            }
+        }
+
         private static IEnumerator PlayMission(ToolCall call)
         {
             if (!Expansions.ExpansionsLoader.IsExpansionInstalled("MakingHistory"))
@@ -461,6 +557,12 @@ namespace com.github.lhervier.ksp.mcpserver
             public SceneWatch(GameScenes scene)
             {
                 _scene = scene;
+            }
+
+            /// <summary>The scene watched for.</summary>
+            public GameScenes Scene
+            {
+                get { return _scene; }
             }
 
             public void OnLoaded(GameScenes scene)
@@ -647,12 +749,14 @@ namespace com.github.lhervier.ksp.mcpserver
         /// The vessel of the game whose id is <paramref name="key"/>, or else the only one named so; null with
         /// <paramref name="error"/> set when there is none, or when the name is shared.
         /// </summary>
-        private static Vessel FindVessel(string key, out string error)
+        private static Vessel FindVessel(string key, out string error, bool trackingStation = false)
         {
             error = null;
-            if (!HighLogic.LoadedSceneIsFlight || FlightGlobals.fetch == null)
+            bool scene = HighLogic.LoadedSceneIsFlight
+                || (trackingStation && HighLogic.LoadedScene == GameScenes.TRACKSTATION);
+            if (!scene || FlightGlobals.fetch == null)
             {
-                error = "Not in flight";
+                error = trackingStation ? "Neither in flight nor at the tracking station" : "Not in flight";
                 return null;
             }
             Vessel found = null;
@@ -1041,6 +1145,90 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return WaitForNewActiveVessel(call, previous);
         }
 
+        private static IEnumerator RevertToEditor(ToolCall call)
+        {
+            if (!InFlight(call))
+            {
+                yield break;
+            }
+            EditorFacility facility;
+            switch ((call.String("facility") ?? "VAB").ToUpperInvariant())
+            {
+                case "VAB":
+                    facility = EditorFacility.VAB;
+                    break;
+                case "SPH":
+                    facility = EditorFacility.SPH;
+                    break;
+                default:
+                    call.Fail("facility: VAB or SPH");
+                    yield break;
+            }
+            if (!FlightDriver.CanRevertToPrelaunch || FlightDriver.PreLaunchState == null)
+            {
+                call.Fail("This flight cannot be reverted to an editor");
+                yield break;
+            }
+            SceneWatch watch = new SceneWatch(GameScenes.EDITOR);
+            GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
+            FlightDriver.RevertToPrelaunch(facility);
+            yield return WaitForScene(call, watch);
+            if (!call.IsError)
+            {
+                call.Text(State());
+            }
+        }
+
+        private static IEnumerator RecoverVessel(ToolCall call)
+        {
+            if (!InFlight(call))
+            {
+                yield break;
+            }
+            Vessel v = FlightGlobals.ActiveVessel;
+            if (v == null || !v.IsRecoverable)
+            {
+                call.Fail("The active vessel cannot be recovered");
+                yield break;
+            }
+            // The button refuses for the same reasons: moving, on a ladder, about to crash...
+            ClearToSaveStatus status = FlightGlobals.ClearToSave();
+            if (status != ClearToSaveStatus.CLEAR)
+            {
+                call.Fail("KSP refuses to recover now: " + status);
+                yield break;
+            }
+            SceneWatch watch = new SceneWatch(GameScenes.SPACECENTER);
+            GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
+            GameEvents.OnVesselRecoveryRequested.Fire(v);
+            yield return WaitForScene(call, watch);
+            if (call.IsError)
+            {
+                yield break;
+            }
+
+            // The vessel is recovered once the space centre is up, and the report follows.
+            KSP.UI.Screens.MissionRecoveryDialog report = null;
+            float start = Time.realtimeSinceStartup;
+            while (report == null)
+            {
+                if (Time.realtimeSinceStartup - start > 30f)
+                {
+                    call.Fail("The space centre is up, but no recovery report after 30 seconds");
+                    yield break;
+                }
+                yield return null;
+                report = UnityEngine.Object.FindObjectOfType<KSP.UI.Screens.MissionRecoveryDialog>();
+            }
+            Dictionary<string, object> state = State();
+            state["recovery"] = new Dictionary<string, object>
+            {
+                { "location", report.recoveryLocation },
+                { "factor", report.recoveryFactor }
+            };
+            call.Text(state);
+        }
+
         private static IEnumerator GoToScene(ToolCall call)
         {
             GameScenes scene;
@@ -1052,8 +1240,11 @@ namespace com.github.lhervier.ksp.mcpserver
                 case "TRACKSTATION":
                     scene = GameScenes.TRACKSTATION;
                     break;
+                case "MAINMENU":
+                    scene = GameScenes.MAINMENU;
+                    break;
                 default:
-                    call.Fail("scene: SPACECENTER or TRACKSTATION");
+                    call.Fail("scene: SPACECENTER, TRACKSTATION or MAINMENU");
                     yield break;
             }
             if (HighLogic.CurrentGame == null)
@@ -1061,24 +1252,243 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail("No game loaded");
                 yield break;
             }
+            // What the buttons above the altimeter do in flight, and what leaving any other scene does. Quit
+            // to Main Menu, in flight, also forgets the vessels' persistent ids before saving (internal).
+            if (scene == GameScenes.MAINMENU && HighLogic.LoadedSceneIsFlight)
+            {
+                MethodInfo clearIds = typeof(FlightGlobals).GetMethod("ClearpersistentIdDictionaries",
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                if (clearIds == null)
+                {
+                    call.Fail("FlightGlobals.ClearpersistentIdDictionaries not found in this version of KSP");
+                    yield break;
+                }
+                clearIds.Invoke(null, null);
+            }
             SceneWatch watch = new SceneWatch(scene);
             GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
-            // What the buttons above the altimeter do in flight, and what leaving any other scene does.
             GamePersistence.SaveGame("persistent", HighLogic.SaveFolder, SaveMode.OVERWRITE);
             HighLogic.LoadScene(scene);
+            yield return WaitForScene(call, watch);
+            if (!call.IsError)
+            {
+                call.Text(State());
+            }
+        }
+
+        private static IEnumerator FlyVessel(ToolCall call)
+        {
+            if (HighLogic.LoadedScene != GameScenes.TRACKSTATION)
+            {
+                call.Fail("Vessels are flown from the tracking station, and the game is in " + HighLogic.LoadedScene);
+                yield break;
+            }
+            string error;
+            Vessel vessel = FindVessel(call.String("vessel"), out error, true);
+            if (vessel == null)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            if (vessel.DiscoveryInfo.Level != DiscoveryLevels.Owned)
+            {
+                call.Fail(vessel.vesselName + " is not the player's: the tracking station does not fly it");
+                yield break;
+            }
+            // What the Fly button does for a vessel of the player's.
+            GamePersistence.SaveGame("persistent", HighLogic.SaveFolder, SaveMode.OVERWRITE);
+            FlightDriver.StartAndFocusVessel("persistent", FlightGlobals.Vessels.IndexOf(vessel));
+            yield return WaitForNewActiveVessel(call, null);
+        }
+
+        private static IEnumerator OpenFacility(ToolCall call)
+        {
+            if (HighLogic.LoadedScene != GameScenes.SPACECENTER)
+            {
+                call.Fail("Buildings open from the space centre, and the game is in " + HighLogic.LoadedScene);
+                yield break;
+            }
+            string name = call.String("facility") ?? "";
+            SpaceCenterBuilding building = null;
+            List<string> names = new List<string>();
+            foreach (SpaceCenterBuilding b in UnityEngine.Object.FindObjectsOfType<SpaceCenterBuilding>())
+            {
+                names.Add(b.facilityName);
+                if (string.Equals(b.facilityName, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    building = b;
+                }
+            }
+            if (building == null)
+            {
+                names.Sort(StringComparer.Ordinal);
+                call.Fail("No building " + name + " at the space centre; there are: " + string.Join(", ", names.ToArray()));
+                yield break;
+            }
+
+            // A building either opens a scene, or a screen over the space centre: a second tells them apart.
+            // Both handlers before the click: the scene may be up a few frames after it is asked for.
+            SceneRequest request = new SceneRequest();
+            GameEvents.onGameSceneLoadRequested.Add(request.OnRequested);
+            GameEvents.onLevelWasLoadedGUIReady.Add(request.OnLoaded);
+            building.OnLeftClick();
+            float start = Time.realtimeSinceStartup;
+            while (!request.Loaded)
+            {
+                float elapsed = Time.realtimeSinceStartup - start;
+                if (!request.Requested && elapsed >= 1f)
+                {
+                    break;
+                }
+                if (elapsed > 180f)
+                {
+                    call.Fail("The scene " + request.Scene + " was not up after 3 minutes");
+                    break;
+                }
+                yield return null;
+            }
+            GameEvents.onGameSceneLoadRequested.Remove(request.OnRequested);
+            GameEvents.onLevelWasLoadedGUIReady.Remove(request.OnLoaded);
+            if (!call.IsError)
+            {
+                call.Text(State());
+            }
+        }
+
+        private static IEnumerator CloseScreen(ToolCall call)
+        {
+            Dictionary<string, object> answer = new Dictionary<string, object> { { "closed", "nothing" } };
+            PopupDialog[] dialogs = UnityEngine.Object.FindObjectsOfType<PopupDialog>();
+            KSP.UI.Screens.MissionRecoveryDialog report = HighLogic.LoadedScene == GameScenes.SPACECENTER
+                ? UnityEngine.Object.FindObjectOfType<KSP.UI.Screens.MissionRecoveryDialog>() : null;
+            KSP.UI.Screens.UISpaceCenter ui = HighLogic.LoadedScene == GameScenes.SPACECENTER
+                ? KSP.UI.Screens.UISpaceCenter.Instance : null;
+            bool dialogsOnly = call.Bool("dialogs_only");
+            if (dialogs.Length > 0)
+            {
+                PopupDialog dialog = dialogs[dialogs.Length - 1];
+                List<DialogGUIButton> buttons = new List<DialogGUIButton>();
+                if (dialog.dialogToDisplay != null && dialog.dialogToDisplay.Options != null)
+                {
+                    foreach (DialogGUIBase option in dialog.dialogToDisplay.Options)
+                    {
+                        CollectButtons(option, buttons);
+                    }
+                }
+                answer["closed"] = "dialog";
+                answer["dialog"] = dialog.dialogToDisplay != null ? dialog.dialogToDisplay.name : "";
+                if (buttons.Count == 1)
+                {
+                    // What a click on its only button does: its callback, then the dialog closed if the button
+                    // closes it and the callback did not already.
+                    answer["button"] = buttons[0].OptionText;
+                    buttons[0].OptionSelected();
+                    yield return null;
+                    if (dialog != null && buttons[0].DismissOnSelect)
+                    {
+                        dialog.Dismiss();
+                    }
+                }
+                else
+                {
+                    dialog.Dismiss();
+                }
+            }
+            else if (report != null && !dialogsOnly)
+            {
+                // What its button does.
+                UnityEngine.Object.Destroy(report.gameObject);
+                answer["closed"] = "recovery report";
+            }
+            else if (ui != null && !dialogsOnly)
+            {
+                // What the screen's Exit button does, the event Escape fires too.
+                if (ui.SpawnedAC)
+                {
+                    GameEvents.onGUIAstronautComplexDespawn.Fire();
+                    answer["closed"] = "AstronautComplex";
+                }
+                else if (ui.SpawnedRD)
+                {
+                    GameEvents.onGUIRnDComplexDespawn.Fire();
+                    answer["closed"] = "RnD";
+                }
+                else if (ui.SpawnedMC)
+                {
+                    GameEvents.onGUIMissionControlDespawn.Fire();
+                    answer["closed"] = "MissionControl";
+                }
+                else if (ui.SpawnedADM)
+                {
+                    GameEvents.onGUIAdministrationFacilityDespawn.Fire();
+                    answer["closed"] = "Administration";
+                }
+            }
+            yield return new WaitForSecondsRealtime(1f);
+            call.Text(answer);
+        }
+
+        /// <summary>Adds to <paramref name="buttons"/> the buttons of a dialog element and of all it holds.</summary>
+        private static void CollectButtons(DialogGUIBase element, List<DialogGUIButton> buttons)
+        {
+            if (element == null)
+            {
+                return;
+            }
+            DialogGUIButton button = element as DialogGUIButton;
+            if (button != null)
+            {
+                buttons.Add(button);
+            }
+            foreach (DialogGUIBase child in element.children)
+            {
+                CollectButtons(child, buttons);
+            }
+        }
+
+        /// <summary>
+        /// Waits until the scene of <paramref name="watch"/>, already subscribed, has loaded, then drops the
+        /// subscription; fails the call after three minutes.
+        /// </summary>
+        private static IEnumerator WaitForScene(ToolCall call, SceneWatch watch)
+        {
             float start = Time.realtimeSinceStartup;
             while (!watch.Loaded)
             {
                 if (Time.realtimeSinceStartup - start > 180f)
                 {
                     GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
-                    call.Fail("The scene " + scene + " was not up after 3 minutes");
+                    call.Fail("The scene " + watch.Scene + " was not up after 3 minutes");
                     yield break;
                 }
                 yield return null;
             }
             GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
-            call.Text(State());
+        }
+
+        /// <summary>
+        /// Records the scene KSP is asked to load, and whether it has loaded since. An instance, since an event
+        /// refuses a static handler.
+        /// </summary>
+        private sealed class SceneRequest
+        {
+            public bool Requested;
+            public GameScenes Scene;
+            public bool Loaded;
+
+            public void OnRequested(GameScenes scene)
+            {
+                Requested = true;
+                Scene = scene;
+            }
+
+            public void OnLoaded(GameScenes scene)
+            {
+                if (Requested && scene == Scene)
+                {
+                    Loaded = true;
+                }
+            }
         }
 
         private static IEnumerator QuitGame(ToolCall call)
