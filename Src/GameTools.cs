@@ -28,15 +28,17 @@ namespace com.github.lhervier.ksp.mcpserver
                 "with the length of the last one.",
                 Schema.Object(), GetFloatingOrigin);
             yield return new Tool("load_save",
-                "Loads a save into flight, from any scene, and waits until the active vessel is unpacked and " +
-                "physics runs on it.",
+                "Loads a save into flight, from any scene, as the quickload does (the scenarios of the mods installed since " +
+                "are added), and waits until the active vessel is unpacked and physics runs on it.",
                 Schema.Object(
                     Schema.P("folder", "string", "the game's folder under saves/", true),
                     Schema.P("save", "string", "the save's name, without .sfs", true)),
                 LoadSave);
             yield return new Tool("open_game",
                 "Opens a game from any scene, the main menu included, as Resume Game does: in the scene it was " +
-                "saved in, the space centre for its persistent save. Waits until that scene is up.",
+                "saved in, the space centre for its persistent save. Like the game, it writes the save back as persistent, " +
+                "with the scenarios of the mods installed since (another save only when it does not start in flight). " +
+                "Waits until that scene is up, and at the space centre until its buildings are set up.",
                 Schema.Object(
                     Schema.P("folder", "string", "the game's folder under saves/", true),
                     Schema.P("save", "string", "the save's name, without .sfs (default persistent)")),
@@ -393,15 +395,23 @@ namespace com.github.lhervier.ksp.mcpserver
         {
             string folder = call.String("folder");
             string save = call.String("save");
+            // LoadGame also clears the dictionaries of persistent ids, which are internal; the file is read again
+            // for onGameStatePostLoad, which wants its node.
             Game game = GamePersistence.LoadGame(save, folder, true, false);
+            ConfigNode node = GamePersistence.LoadSFSFile(save, folder);
             if (game == null || game.flightState == null)
             {
                 call.Fail("Could not load saves/" + folder + "/" + save + ".sfs");
                 yield break;
             }
+
+            // What the quickload does (QuickSaveLoad.onQuickloadPipelineFinished): without UpdateScenarioModules,
+            // the scenario of a mod the save does not hold yet (Principia's, added to all games) never runs.
             Vessel previous = FlightGlobals.ActiveVessel;
+            GamePersistence.UpdateScenarioModules(game);
             HighLogic.SaveFolder = folder;
             HighLogic.CurrentGame = game;
+            GameEvents.onGameStatePostLoad.Fire(node);
             FlightDriver.StartAndFocusVessel(game, game.flightState.activeVesselIdx);
             yield return WaitForNewActiveVessel(call, previous);
         }
@@ -419,11 +429,18 @@ namespace com.github.lhervier.ksp.mcpserver
                 yield break;
             }
 
-            // What the main menu's Resume Game does, except saving the game back as persistent.
+            // What the main menu's Resume Game does. It saves the game back as persistent once the scenarios of the
+            // installed mods are added: the space centre reads persistent from disk (SpaceCenterMain.Start), and
+            // would open the game without them. Another save is written as persistent only when it does not start
+            // in flight, as the quickload does it.
             Vessel previous = FlightGlobals.ActiveVessel;
             SceneWatch watch = new SceneWatch(game.startScene);
             GameEvents.onLevelWasLoadedGUIReady.Add(watch.OnLoaded);
             GamePersistence.UpdateScenarioModules(game);
+            if (save == "persistent" || game.startScene != GameScenes.FLIGHT)
+            {
+                GamePersistence.SaveGame(game, "persistent", folder, SaveMode.OVERWRITE);
+            }
             HighLogic.CurrentGame = game;
             HighLogic.SaveFolder = folder;
             GameEvents.onGameStatePostLoad.Fire(node);
@@ -450,7 +467,39 @@ namespace com.github.lhervier.ksp.mcpserver
                 yield return null;
             }
             GameEvents.onLevelWasLoadedGUIReady.Remove(watch.OnLoaded);
+            if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
+            {
+                yield return WaitForBuildingColliders();
+            }
             call.Text(State());
+        }
+
+        /// <summary>
+        /// Waits until every building of the space centre has set up its colliders, or 10 seconds at most.
+        /// </summary>
+        private static IEnumerator WaitForBuildingColliders()
+        {
+            // SpaceCenterBuilding.Start sets them up two frames after it starts, once its SetupFacility is over.
+            // Leaving the space centre in that very frame leaves them in the next scene with no building, where
+            // each frame of the mouse over one of them throws in SpaceCenterBuildingCollider.OnMouseOver.
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < 10f)
+            {
+                var withColliders = new HashSet<SpaceCenterBuilding>();
+                foreach (SpaceCenterBuildingCollider collider in UnityEngine.Object.FindObjectsOfType<SpaceCenterBuildingCollider>())
+                {
+                    if (collider.building != null)
+                    {
+                        withColliders.Add(collider.building);
+                    }
+                }
+                SpaceCenterBuilding[] buildings = UnityEngine.Object.FindObjectsOfType<SpaceCenterBuilding>();
+                if (buildings.Length > 0 && Array.TrueForAll(buildings, withColliders.Contains))
+                {
+                    yield break;
+                }
+                yield return null;
+            }
         }
 
         private static IEnumerator NewGame(ToolCall call)
