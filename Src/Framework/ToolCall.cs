@@ -1,30 +1,10 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace com.github.lhervier.ksp.mcpserver
 {
-    /// <summary>
-    /// One tool offered to the MCP client: its name, description, JSON schema of its arguments, and the
-    /// coroutine that runs it on Unity's main thread.
-    /// </summary>
-    internal sealed class Tool
-    {
-        public readonly string Name;
-        public readonly string Description;
-        public readonly Dictionary<string, object> InputSchema;
-        public readonly Func<ToolCall, IEnumerator> Run;
-
-        public Tool(string name, string description, Dictionary<string, object> inputSchema, Func<ToolCall, IEnumerator> run)
-        {
-            Name = name;
-            Description = description;
-            InputSchema = inputSchema;
-            Run = run;
-        }
-    }
-
     /// <summary>
     /// A call to a tool: its arguments, and the result the tool's coroutine fills before it ends. A tool
     /// that never sets a result answers with an empty text.
@@ -91,47 +71,29 @@ namespace com.github.lhervier.ksp.mcpserver
         {
             return Has(name) ? Convert.ToBoolean(Arguments[name], CultureInfo.InvariantCulture) : fallback;
         }
-    }
 
-    /// <summary>Builds the JSON schemas of tool arguments.</summary>
-    internal static class Schema
-    {
-        /// <summary>An object schema from (name, type, description, required) entries.</summary>
-        public static Dictionary<string, object> Object(params Prop[] props)
+        /// <summary>
+        /// The value an argument names among <paramref name="choices"/>, its keys compared without case;
+        /// the one <paramref name="fallback"/> names when the argument is left out. Returns false after
+        /// failing the call with the keys it accepts when the argument names none of them.
+        /// </summary>
+        public bool Choice<T>(string name, string fallback, IDictionary<string, T> choices, out T value)
         {
-            Dictionary<string, object> properties = new Dictionary<string, object>();
-            List<object> required = new List<object>();
-            foreach (Prop p in props)
+            string given = String(name, fallback) ?? "";
+            foreach (KeyValuePair<string, T> choice in choices)
             {
-                properties[p.Name] = new Dictionary<string, object> { { "type", p.Type }, { "description", p.Description } };
-                if (p.Required)
+                if (string.Equals(choice.Key, given, StringComparison.OrdinalIgnoreCase))
                 {
-                    required.Add(p.Name);
+                    value = choice.Value;
+                    return true;
                 }
             }
-            Dictionary<string, object> schema = new Dictionary<string, object>
-            {
-                { "type", "object" },
-                { "properties", properties }
-            };
-            if (required.Count > 0)
-            {
-                schema["required"] = required;
-            }
-            return schema;
-        }
-
-        public static Prop P(string name, string type, string description, bool required = false)
-        {
-            return new Prop { Name = name, Type = type, Description = description, Required = required };
-        }
-
-        internal struct Prop
-        {
-            public string Name;
-            public string Type;
-            public string Description;
-            public bool Required;
+            string[] keys = choices.Keys.ToArray();
+            Fail(name + ": " + (keys.Length > 1
+                ? string.Join(", ", keys, 0, keys.Length - 1) + " or " + keys[keys.Length - 1]
+                : string.Join("", keys)));
+            value = default(T);
+            return false;
         }
     }
 }

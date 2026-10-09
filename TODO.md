@@ -2,20 +2,13 @@
 
 What is left to do on KSP-MCPServer, most urgent first.
 
-- **No way to stop `drive_to`**: once called, it steers the wheels every frame until it arrives or 300 s
-  have passed, even after its caller gave up waiting; pausing the game only holds it. Add a `stop_drive`
-  tool, and end any drive when the active vessel changes or the flight scene closes. A `stop_drive` needs
-  the item below first.
-- **One request at a time**: `McpHttpServer` serves its requests on a single thread, each to the end of
-  its tool (`MainThread.RunAndWait`) before taking the next. While a `drive_to` runs, even `get_state`
-  waits for it to finish (seen: about 210 s). Serve each request on its own thread, the tools still
-  running on Unity's main thread.
-- **`drive_to` on a tall rover over rough ground**: on the Earth of Real Solar System, near Kourou,
-  `Diag3-Rover` rolled over three times out of four drives (6 m/s once, 3 m/s twice), turning hard or
-  reversing over bumps. The direction (forward or reverse) is chosen once, from the heading at the start:
-  a rover that turns round while reversing makes the drive stop, the target being then behind. Choose the
-  direction again while driving, limit the steering with speed, and stop when the rover is no longer
-  upright.
+- **Check `drive_to` on a tall rover over rough ground**, on the Earth of Real Solar System near Kourou,
+  where `Diag3-Rover` rolled over three times out of four drives (6 m/s once, 3 m/s twice). The control
+  point of that rover faces up: the drives read its speed and heading along an axis that stood upright,
+  so they never cut the throttle (seen on Kerbin: 28 m/s for 4 asked). They now drive along the axis the
+  wheels drive along, choose forward or reverse again when the target falls behind, steer less above
+  3 m/s, and stop when the rover tips over or runs away; on Kerbin, `Diag3-Rover` now reaches its target
+  at 4, 6 and 10 m/s. Not yet driven near Kourou.
 - **`set_position` over a long jump**: moved from the launchpad of the KSC to the other side of Kerbin
   (latitude 3.165°, longitude −141.128°), a two-part craft crashed through the terrain about a second
   after being unpacked, three times out of three, with and without Terrain Precision Fix. The ground of
@@ -24,18 +17,20 @@ What is left to do on KSP-MCPServer, most urgent first.
   setting it down (with or without the ease of the menu). It still went through the ground near Kourou in
   Real Solar System, and once set down it read a speed over the ground of 462 m/s, the speed of Earth's
   turning at the equator, while it stood still: the velocity the jump gives it looks wrong, not the
-  ground.
-- **`play_mission` resumes the mission's saved game** (`saves/missions/<mission>/persistent.sfs`) when
-  there is one, instead of starting it again as its description says: see what *Restart* does in
-  `MissionPlayDialog`.
+  ground. `FlightGlobals.SetVesselPosition` gives the vessel the velocity of the turning ground
+  (`angularVelocity` × radius) after turning the rotating frame off (`PrepForOrbitSet`), and
+  `PostOrbitSet` may turn it on again: measure the speed over the ground right after the jump, short and
+  long.
 - **`launch_vessel` with a site mover**: with KSCSwitcher sending the KSC to Kourou
   in Real Solar System, a craft launched by `launch_vessel` from the space centre appeared at Kourou with
-  no building of the KSC around it; launched from the VAB by hand, the KSC stood there. Find what the
-  editor's launch does that `FlightDriver.StartWithNewLaunch` alone does not.
-- **`launch_vessel` waits three minutes** when KSP gives up a launch and goes back to the space centre
-  (a launch site it cannot find): fail as soon as the scene goes back. Seen from flight with the Mun
-  loaded: `Cannot find a transform named 'Facility/LaunchPad_spawn'`, then the space centre, and the
-  server answered nothing more until KSP was restarted; from the space centre, the launch works.
+  no building of the KSC around it; launched from the VAB by hand, the KSC stood there. KSCSwitcher moves
+  the KSC only when a game is created at the space centre. Before its launch, the editor also writes the
+  launch site it chose as the game's default (`EditorDriver.saveselectedLaunchSite`), which the launch
+  dialog of the space centre does not. Not seen since: to play again with KSCSwitcher.
+- **`launch_vessel` from flight with the Mun loaded**: once, KSP gave the launch up
+  (`Cannot find a transform named 'Facility/LaunchPad_spawn'`) and went back to the space centre. The
+  tool now fails as soon as KSP leaves for another scene, in a second; launched again from the orbit of
+  the Mun, the craft reached the pad: what made KSP give up is not known.
 
 - **Check the stall recovery of `drive_to`** on the lip of the runway deck: approaching a spot on the
   deck from the grass, the rover used to creep at its lowest speed against the lip until the 300 s limit.

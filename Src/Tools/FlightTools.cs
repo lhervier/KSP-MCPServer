@@ -29,12 +29,11 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private static IEnumerator SetFlight(ToolCall call)
         {
-            Vessel v = FlightGlobals.ActiveVessel;
-            if (v == null)
+            if (!Require.ActiveVessel(call))
             {
-                call.Fail("No active vessel");
                 yield break;
             }
+            Vessel v = FlightGlobals.ActiveVessel;
             if (call.Has("throttle"))
             {
                 // What the throttle keys write: the state the game copies into the vessel's controls every frame.
@@ -67,7 +66,7 @@ namespace com.github.lhervier.ksp.mcpserver
                 v.Autopilot.SetMode(mode);
                 yield return null;
             }
-            Dictionary<string, object> state = GameTools.State();
+            Dictionary<string, object> state = GameState.State();
             state["throttle"] = (double)FlightInputHandler.state.mainThrottle;
             state["sasMode"] = v.Autopilot.Mode.ToString();
             call.Text(state);
@@ -75,9 +74,8 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private static IEnumerator Stage(ToolCall call)
         {
-            if (FlightGlobals.ActiveVessel == null)
+            if (!Require.ActiveVessel(call))
             {
-                call.Fail("No active vessel");
                 yield break;
             }
             StageManager.ActivateNextStage();

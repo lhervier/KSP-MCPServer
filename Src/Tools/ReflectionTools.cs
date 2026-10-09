@@ -33,7 +33,7 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("type", "string", "type name, full or short", true),
                     Schema.P("member", "string", "field or property name, or a path", true),
                     Schema.P("match", "string", MatchDescription)),
-                GetMember);
+                GetMember) { Concurrent = true };
             yield return new Tool("set_member",
                 "Writes a field or property of the first loaded object of a type, or a static one. The value is a " +
                 "number, string or boolean, or an object {x, y, width, height} for a Rect, {x, y, z} for a vector.",
@@ -42,7 +42,7 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("member", "string", "field or property name", true),
                     Schema.P("value", "object", "the new value", true),
                     Schema.P("match", "string", MatchDescription)),
-                SetMember);
+                SetMember) { Concurrent = true };
             yield return new Tool("call_method",
                 "Calls a method without arguments of the first loaded object of a type, or a static one, and " +
                 "returns what it returns.",
@@ -50,7 +50,7 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("type", "string", "type name, full or short", true),
                     Schema.P("method", "string", "method name", true),
                     Schema.P("match", "string", MatchDescription)),
-                CallMethod);
+                CallMethod) { Concurrent = true };
         }
 
         // ----- generic reflection -----

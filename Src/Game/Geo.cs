@@ -21,9 +21,14 @@ namespace com.github.lhervier.ksp.mcpserver
         /// <summary>The direction the vessel's control point faces, in degrees from north towards east.</summary>
         public static double Heading(Vessel v)
         {
+            return Heading(v, v.ReferenceTransform.up);
+        }
+
+        /// <summary>The direction a world-space vector points in at a vessel, in degrees from north towards east.</summary>
+        public static double Heading(Vessel v, Vector3d forward)
+        {
             Vector3d north, east;
             NorthEast(v, out north, out east);
-            Vector3d forward = v.ReferenceTransform.up;
             return Normalize(Math.Atan2(Vector3d.Dot(forward, east), Vector3d.Dot(forward, north)) * 180.0 / Math.PI);
         }
 

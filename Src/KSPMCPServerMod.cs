@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 
 namespace com.github.lhervier.ksp.mcpserver
@@ -11,8 +10,6 @@ namespace com.github.lhervier.ksp.mcpserver
     [KSPAddon(KSPAddon.Startup.Instantly, true)]
     public class KSPMCPServerMod : MonoBehaviour
     {
-        private const int DefaultPort = 8770;
-
         private McpHttpServer _server;
         private bool _subscribed;
 
@@ -22,17 +19,23 @@ namespace com.github.lhervier.ksp.mcpserver
             MainThread.SetHost(this);
 
             List<Tool> tools = new List<Tool>();
+            tools.AddRange(StateTools.All());
             tools.AddRange(GameTools.All());
-            tools.AddRange(DriveTools.All());
+            tools.AddRange(SceneTools.All());
+            tools.AddRange(VesselTools.All());
+            tools.AddRange(SpaceCenterTools.All());
+            tools.AddRange(TimeTools.All());
+            tools.AddRange(ViewTools.All());
             tools.AddRange(FlightTools.All());
+            tools.AddRange(DriveTools.All());
             tools.AddRange(ReflectionTools.All());
             tools.AddRange(ExtensionTools.All());
 
-            ConfigNode settings = ReadSettings();
-            ToolMessage.SetEnabled(ReadBool(settings, "screen_messages", true));
+            Settings settings = Settings.Read();
+            ToolMessage.SetEnabled(settings.ScreenMessages);
             try
             {
-                _server = new McpHttpServer(ReadPort(settings), tools);
+                _server = new McpHttpServer(settings.Port, new McpProtocol(tools));
                 _server.Start();
             }
             catch (Exception e)
@@ -73,41 +76,12 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private void OnOriginShift(Vector3d offset, Vector3d nonFrame)
         {
-            GameTools.OnOriginShift(offset, nonFrame);
+            GameState.OnOriginShift(offset, nonFrame);
         }
 
         private void OnFlightReady()
         {
-            GameTools.OnFlightReady();
-        }
-
-        // PluginData/settings.cfg next to the DLL; null when it is not there.
-        private static ConfigNode ReadSettings()
-        {
-            string path = Path.Combine(Path.GetDirectoryName(typeof(KSPMCPServerMod).Assembly.Location) ?? "", "PluginData/settings.cfg");
-            return File.Exists(path) ? ConfigNode.Load(path) : null;
-        }
-
-        // The port from the settings; the default when it is not there.
-        private static int ReadPort(ConfigNode settings)
-        {
-            int port;
-            if (settings != null && int.TryParse(settings.GetValue("port"), out port))
-            {
-                return port;
-            }
-            return DefaultPort;
-        }
-
-        // A true or false value from the settings; the fallback when it is not there or not a boolean.
-        private static bool ReadBool(ConfigNode settings, string name, bool fallback)
-        {
-            bool value;
-            if (settings != null && bool.TryParse(settings.GetValue(name), out value))
-            {
-                return value;
-            }
-            return fallback;
+            GameState.OnFlightReady();
         }
     }
 }

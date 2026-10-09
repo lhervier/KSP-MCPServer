@@ -15,16 +15,24 @@ world, and this mod parks it there to within a centimetre
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
-some people would rather stop reading here. What there is to check here is small: the source is fourteen
+some people would rather stop reading here. What there is to check here is small: the source is thirty
 short files, it opens no port beyond the loopback address, and it changes nothing in the game until a
 request asks it to.
 
 ## What it offers
 
-Every tool runs on the game's main thread, one at a time, and answers once it is done: `drive_to` answers
-when the rover is parked, `load_save` when the vessel is in flight and physics runs on it. While it runs,
-a short message at the top of the screen names it, with its arguments, so that whoever watches the game
-sees what drives it: one message at a time, each tool's replacing the last, and never on a screenshot.
+Every tool runs on the game's main thread and answers once it is done: `drive_to` answers when the rover
+is parked, `load_save` when the vessel is in flight and physics runs on it. While it runs, a short message
+at the top of the screen names it, with its arguments, so that whoever watches the game sees what drives
+it: one message at a time, each tool's replacing the last, and never on a screenshot.
+
+The tools that act on the game run one at a time: while one runs, another is refused at once, with the
+name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
+`get_state`, `get_floating_origin`, `list_vessels`, `get_terrain`, `wait`, `screenshot`, `set_camera`,
+`set_ui`, `set_pause`, `set_cheats`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
+and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
+stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
+then lets go of what it holds, the wheels of a rover say.
 
 | tool | what it does |
 |---|---|
@@ -32,7 +40,7 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in, written back as `persistent`; at the space centre, returns once its buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
-| `play_mission` | starts a mission of Making History from the main menu, from its start, as *Play Missions* does: in the scene the mission starts in |
+| `play_mission` | starts a mission of Making History from the main menu, from its start, as *Restart* then *Play* of *Play Missions* do: in the scene the mission starts in |
 | `load_save` | loads a save into flight, from any scene, as the quickload does |
 | `save_game` | saves the game as it is now under a name, as a quicksave does |
 | `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does; refuses a craft with parts not yet unlocked, or too heavy, too large or of too many parts for the level of its site and its editor |
@@ -64,7 +72,11 @@ sees what drives it: one message at a time, each tool's replacing the last, and 
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
 | `drive` | drives a rover along a heading, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
-| `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, and stops there with the brakes on, still |
+| `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, and stops there with the brakes on, still; stops and turns round when the target falls behind |
+| `stop_drive` | stops a `drive` or a `drive_to` still running, or the wheels `set_controls` holds, and brakes |
+
+A drive stops, the rover braked, when it tips over, when it runs away at twice the speed asked, when the
+active vessel changes or when the flight ends.
 | `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components |
 | `call_method` | calls a method without arguments of a loaded object of any mod |
 
@@ -133,6 +145,8 @@ one at all can declare its own attribute class of that name, with `Name` and `De
 - Its parameters become the tool's arguments, by name: numbers, strings, booleans.
 - What it returns is written as JSON: numbers, strings, booleans, lists, dictionaries, and the public
   fields of any other object. A `void` method answers `done`.
+- It may be called while another tool runs, a `drive_to` say: it should do its work at once, as a button
+  of a window does.
 
 KSP Diag - Terrain Height and Diag FloatingOrigin offer their Record and Clear buttons this way, the reading of
 their table, and the moving, showing and hiding of their window.

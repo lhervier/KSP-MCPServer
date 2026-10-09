@@ -91,7 +91,7 @@ namespace com.github.lhervier.ksp.mcpserver
                 props.Add(Schema.P(parameter.Name, JsonType(parameter.ParameterType), parameter.ParameterType.Name,
                     !parameter.IsOptional));
             }
-            return new Tool(name, description, Schema.Object(props.ToArray()), call => Run(call, method));
+            return new Tool(name, description, Schema.Object(props.ToArray()), call => Run(call, method)) { Concurrent = true };
         }
 
         private static string JsonType(Type type)
