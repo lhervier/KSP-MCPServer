@@ -21,6 +21,17 @@ What is left to do on KSP-MCPServer, most urgent first.
   (`angularVelocity` × radius) after turning the rotating frame off (`PrepForOrbitSet`), and
   `PostOrbitSet` may turn it on again: measure the speed over the ground right after the jump, short and
   long.
+  Seen again on Kerbin: `Diag3-Rover` (18 parts) jumped 121 km to the Desert Airfield, then to the flat
+  ground 200 m north of it, crashed through the terrain two seconds after arriving, both times; a kerbal
+  on EVA made the same jump unharmed. To bring a craft to a launch site, `launch_vessel` with `site` and
+  `crew` does it.
+- **EVA and EVA construction tools**, so that a protocol that places parts no longer needs a player's
+  hands (anchors on a static, for Terrain Precision Fix): `eva` (a kerbal out of a crewed part, by
+  `FlightEVA.spawnEVA`: public, simple); placing a part from a kerbal's inventory on the ground (the
+  editor of EVA construction drops it through private methods driven by the mouse,
+  `EVAConstructionModeEditor.DropAttachablePart` among them: the state the mouse sets up has to be set up
+  by hand); taking a part off a vessel and attaching it to another (`PickupPart`, `CheckAttach`, which casts
+  a ray under the cursor, `AttachPart`: the hardest, not sure to work cleanly).
 - **`launch_vessel` with a site mover**: with KSCSwitcher sending the KSC to Kourou
   in Real Solar System, a craft launched by `launch_vessel` from the space centre appeared at Kourou with
   no building of the KSC around it; launched from the VAB by hand, the KSC stood there. KSCSwitcher moves

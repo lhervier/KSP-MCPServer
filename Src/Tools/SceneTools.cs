@@ -29,16 +29,29 @@ namespace com.github.lhervier.ksp.mcpserver
         {
             yield return new Tool("launch_vessel",
                 "Launches a vessel from its .craft file at a launch site, as the editor's Launch button does, with " +
-                "the crew the editor would give it by default, and waits until physics runs on it. KSP saves the " +
-                "game as 'persistent' first, as it does for any launch. Needs a game loaded. Refuses a craft " +
-                "whose parts are not all unlocked in this game, where the launch dialog of the space centre asks " +
-                "for a confirmation.",
+                "the crew the editor would give it by default or the kerbals named, and waits until physics runs " +
+                "on it. KSP saves the game as 'persistent' first, as it does for any launch. Needs a game loaded. " +
+                "Refuses a craft whose parts are not all unlocked in this game, where the launch dialog of the " +
+                "space centre asks for a confirmation, and a launch site the game does not offer.",
                 Schema.Object(
                     Schema.P("craft", "string",
                         "the .craft file: absolute, or relative to the Ships folder of the game being played " +
                         "(SPH/<name>.craft or VAB/<name>.craft)", true),
-                    Schema.P("site", "string", "the launch site's name (default Runway; LaunchPad for the pad)")),
+                    Schema.P("site", "string",
+                        "the launch site's name, as list_launch_sites gives it (default Runway; LaunchPad for the pad)"),
+                    Schema.P("crew", "string",
+                        "the kerbals to board, by name, separated by commas, seated in the order of the craft's " +
+                        "seats as the editor fills them; each must be available (default: the editor's crew)"),
+                    Schema.P("empty_inventories", "boolean",
+                        "board the crew with empty inventories, as emptying each kerbal's inventory in the editor's " +
+                        "crew panel does: no parachute, no jetpack (default false)")),
                 LaunchVessel);
+            yield return new Tool("list_launch_sites",
+                "Lists the launch sites a vessel can be launched at, as the launch site selector of the editors " +
+                "offers them: the name launch_vessel takes, the name the game shows, the editor that launches there " +
+                "(VAB or SPH), the body, what places it (the space centre, a PQSCity or a PQSCity2), and the " +
+                "latitude, longitude and altitude of its first spawn point. Needs a game loaded.",
+                Schema.Object(), ListLaunchSites) { Concurrent = true };
             yield return new Tool("revert_to_launch",
                 "Reverts the flight to its launch, as Revert to Launch does, and waits until physics runs on " +
                 "the vessel again.",
@@ -98,6 +111,16 @@ namespace com.github.lhervier.ksp.mcpserver
                 yield break;
             }
             string site = call.String("site", "Runway");
+            List<string> sites = new List<string>();
+            foreach (Dictionary<string, object> known in LaunchSites())
+            {
+                sites.Add((string)known["name"]);
+            }
+            if (!sites.Contains(site))
+            {
+                call.Fail("No launch site '" + site + "' in this game; the sites are: " + string.Join(", ", sites.ToArray()));
+                yield break;
+            }
             string limits = LaunchLimitsBroken(profile, site);
             if (limits != null)
             {
@@ -105,11 +128,170 @@ namespace com.github.lhervier.ksp.mcpserver
                 yield break;
             }
 
-            // The crew the editor proposes for that craft, without hiring anyone.
-            VesselCrewManifest crew = HighLogic.CurrentGame.CrewRoster.DefaultCrewForVessel(craft, null, false);
+            VesselCrewManifest crew;
+            if (call.Has("crew"))
+            {
+                string error;
+                crew = NamedCrew(craft, call.String("crew"), out error);
+                if (crew == null)
+                {
+                    call.Fail(error);
+                    yield break;
+                }
+            }
+            else
+            {
+                // The crew the editor proposes for that craft, without hiring anyone.
+                crew = HighLogic.CurrentGame.CrewRoster.DefaultCrewForVessel(craft, null, false);
+            }
+            if (call.Bool("empty_inventories"))
+            {
+                foreach (ProtoCrewMember kerbal in crew.GetAllCrew(false))
+                {
+                    EmptyInventory(kerbal);
+                }
+            }
             Vessel previous = FlightGlobals.ActiveVessel;
             FlightDriver.StartWithNewLaunch(path, HighLogic.CurrentGame.flagURL, site, crew);
             yield return Waits.ForNewActiveVessel(call, previous);
+        }
+
+        /// <summary>
+        /// Empties a kerbal's inventory, as removing every part from it in the editor's crew panel does; the
+        /// kerbal keeps it empty once on EVA.
+        /// </summary>
+        private static void EmptyInventory(ProtoCrewMember kerbal)
+        {
+            // The panel edits this module, then saves it to the kerbal's inventory node, which the kerbal on EVA
+            // loads its inventory from.
+            ModuleInventoryPart inventory = kerbal.KerbalInventoryModule;
+            if (inventory == null)
+            {
+                kerbal.InventoryNode = new ConfigNode("INVENTORY");
+                return;
+            }
+            for (int slot = 0; slot < inventory.InventorySlots; slot++)
+            {
+                inventory.ClearPartAtSlot(slot);
+            }
+            kerbal.SaveInventory(inventory);
+        }
+
+        private static IEnumerator ListLaunchSites(ToolCall call)
+        {
+            if (!Require.Game(call))
+            {
+                yield break;
+            }
+            call.Text(LaunchSites());
+        }
+
+        /// <summary>
+        /// The launch sites of the game a vessel can be launched at, as the editors' launch site selector offers
+        /// them: the space centre's launch facilities, then the other sites the game finds by name.
+        /// </summary>
+        private static List<Dictionary<string, object>> LaunchSites()
+        {
+            List<Dictionary<string, object>> sites = new List<Dictionary<string, object>>();
+            PSystemSetup setup = PSystemSetup.Instance;
+            if (setup == null)
+            {
+                return sites;
+            }
+            foreach (PSystemSetup.SpaceCenterFacility facility in setup.SpaceCenterFacilityLaunchSites)
+            {
+                PSystemSetup.SpaceCenterFacility.SpawnPoint spawn =
+                    facility.spawnPoints != null && facility.spawnPoints.Length > 0 ? facility.spawnPoints[0] : null;
+                sites.Add(Site(facility.name, KSP.Localization.Localizer.Format(facility.facilityDisplayName), facility.editorFacility, facility.hostBody,
+                    "space centre", spawn != null, spawn != null ? spawn.latitude : 0, spawn != null ? spawn.longitude : 0,
+                    spawn != null ? spawn.altitude : 0));
+            }
+            foreach (LaunchSite site in setup.LaunchSites)
+            {
+                // GetLaunchSite leaves out the sites of an expansion not installed and of a bundle it does not
+                // know: the selector shows none of them, and a launch there fails.
+                if (site == null || setup.GetLaunchSite(site.name) != site)
+                {
+                    continue;
+                }
+                LaunchSite.SpawnPoint spawn = site.spawnPoints != null && site.spawnPoints.Length > 0 ? site.spawnPoints[0] : null;
+                sites.Add(Site(site.name, KSP.Localization.Localizer.Format(site.launchSiteName), site.editorFacility,
+                    site.Body, site.isPQSCity2 ? "PQSCity2" : site.isPQSCity ? "PQSCity" : "other", spawn != null,
+                    spawn != null ? spawn.latitude : 0, spawn != null ? spawn.longitude : 0, spawn != null ? spawn.altitude : 0));
+            }
+            return sites;
+        }
+
+        private static Dictionary<string, object> Site(string name, string displayName, EditorFacility editor,
+            CelestialBody body, string placedBy, bool hasSpawn, double latitude, double longitude, double altitude)
+        {
+            return new Dictionary<string, object>
+            {
+                { "name", name },
+                { "displayName", displayName },
+                { "editor", editor.ToString() },
+                { "body", body != null ? body.bodyName : null },
+                { "placedBy", placedBy },
+                { "latitude", hasSpawn ? (object)latitude : null },
+                { "longitude", hasSpawn ? (object)longitude : null },
+                { "altitude", hasSpawn ? (object)altitude : null }
+            };
+        }
+
+        /// <summary>
+        /// A crew manifest for the craft with the kerbals named, comma-separated, in the order of its crewable
+        /// parts and seats, the other seats empty; or null, with the reason in error, when a kerbal is unknown or
+        /// not available, or when the craft has too few seats.
+        /// </summary>
+        private static VesselCrewManifest NamedCrew(ConfigNode craft, string names, out string error)
+        {
+            error = null;
+            KerbalRoster roster = HighLogic.CurrentGame.CrewRoster;
+            Queue<ProtoCrewMember> kerbals = new Queue<ProtoCrewMember>();
+            foreach (string raw in names.Split(','))
+            {
+                string name = raw.Trim();
+                if (name.Length == 0)
+                {
+                    continue;
+                }
+                ProtoCrewMember kerbal = roster[name];
+                if (kerbal == null)
+                {
+                    error = "No kerbal named '" + name + "' in this game";
+                    return null;
+                }
+                if (kerbal.rosterStatus != ProtoCrewMember.RosterStatus.Available)
+                {
+                    error = name + " is not available: " + kerbal.rosterStatus;
+                    return null;
+                }
+                kerbals.Enqueue(kerbal);
+            }
+
+            // Empty every seat first: the manifest read from the craft may hold the crew it was saved with.
+            VesselCrewManifest manifest = VesselCrewManifest.FromConfigNode(craft);
+            foreach (PartCrewManifest part in manifest.GetCrewableParts())
+            {
+                ProtoCrewMember[] seats = part.GetPartCrew();
+                for (int seat = 0; seat < seats.Length; seat++)
+                {
+                    if (seats[seat] != null)
+                    {
+                        part.RemoveCrewFromSeat(seat);
+                    }
+                }
+                for (int seat = 0; seat < seats.Length && kerbals.Count > 0; seat++)
+                {
+                    part.AddCrewToSeat(kerbals.Dequeue(), seat);
+                }
+            }
+            if (kerbals.Count > 0)
+            {
+                error = "The craft has too few seats for the crew named: " + kerbals.Count + " left without one";
+                return null;
+            }
+            return manifest;
         }
 
         /// <summary>

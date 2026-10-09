@@ -139,7 +139,18 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail("The active vessel cannot be its own target");
                 yield break;
             }
-            FlightGlobals.fetch.SetVesselTarget(vessel);
+            // While targeting is locked, EVA construction mode for one, the game ignores the request and only
+            // tells the player so on screen. The lock KSP sets on every control while its window is not in focus
+            // is left aside: a player clicking a target never meets it, a client of this server always may.
+            foreach (KeyValuePair<string, ulong> entry in InputLockManager.lockStack)
+            {
+                if (entry.Key != "flightDriver_ApplicationFocus" && (entry.Value & (ulong)ControlTypes.TARGETING) != 0)
+                {
+                    call.Fail("Targeting is locked (" + entry.Key + "), as it is in EVA construction mode: leave it first");
+                    yield break;
+                }
+            }
+            FlightGlobals.fetch.SetVesselTarget(vessel, true);
             yield return null;
             call.Text("target: " + vessel.vesselName + " (" + vessel.id + ")");
         }

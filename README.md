@@ -28,7 +28,7 @@ it: one message at a time, each tool's replacing the last, and never on a screen
 
 The tools that act on the game run one at a time: while one runs, another is refused at once, with the
 name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
-`get_state`, `get_floating_origin`, `list_vessels`, `get_terrain`, `wait`, `screenshot`, `set_camera`,
+`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `wait`, `screenshot`, `set_camera`,
 `set_ui`, `set_pause`, `set_cheats`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
 and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
@@ -43,10 +43,11 @@ then lets go of what it holds, the wheels of a rover say.
 | `play_mission` | starts a mission of Making History from the main menu, from its start, as *Restart* then *Play* of *Play Missions* do: in the scene the mission starts in |
 | `load_save` | loads a save into flight, from any scene, as the quickload does |
 | `save_game` | saves the game as it is now under a name, as a quicksave does |
-| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it, as the editor's Launch button does; refuses a craft with parts not yet unlocked, or too heavy, too large or of too many parts for the level of its site and its editor |
+| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it or the kerbals named, their inventories emptied or not, as the editor's Launch button does; refuses a launch site the game does not offer, and a craft with parts not yet unlocked, or too heavy, too large or of too many parts for the level of its site and its editor |
+| `list_launch_sites` | the launch sites a vessel can be launched at, as the editors' launch site selector offers them: the name `launch_vessel` takes, the name shown, the editor, the body, what places the site (the space centre, a `PQSCity` or a `PQSCity2`), and where its first spawn point lies |
 | `list_vessels` | the vessels of the game: id, name, situation, loaded or not, packed or not, active or target, distance from the active vessel |
 | `switch_vessel` | makes a vessel the active one: a loaded one as the switch vessel keys `[` and `]` do, one far away as *Switch To* of the map view does |
-| `set_target` | sets the active vessel's target to another vessel, or clears it |
+| `set_target` | sets the active vessel's target to another vessel, or clears it; refuses while targeting is locked, as it is in EVA construction mode, but not because the window of KSP is out of focus |
 | `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
