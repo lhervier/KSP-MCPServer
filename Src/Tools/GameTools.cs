@@ -23,7 +23,7 @@ namespace com.github.lhervier.ksp.mcpserver
                 "Loads a save into flight, from any scene, as the quickload does (the scenarios of the mods installed since " +
                 "are added), and waits until the active vessel is unpacked and physics runs on it.",
                 Schema.Object(
-                    Schema.P("folder", "string", "the game's folder under saves/", true),
+                    Schema.P("folder", "string", "the game's folder under saves/ (default: the game being played)"),
                     Schema.P("save", "string", "the save's name, without .sfs", true)),
                 LoadSave);
             yield return new Tool("open_game",
@@ -86,7 +86,7 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private static IEnumerator LoadSave(ToolCall call)
         {
-            string folder = call.String("folder");
+            string folder = call.String("folder", HighLogic.SaveFolder);
             string save = call.String("save");
             // LoadGame also clears the dictionaries of persistent ids, which are internal; the file is read again
             // for onGameStatePostLoad, which wants its node.

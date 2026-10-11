@@ -60,6 +60,7 @@ namespace com.github.lhervier.ksp.mcpserver
                     { "heightFromTerrain", (double)v.heightFromTerrain },
                     { "surfaceSpeed", v.srfSpeed },
                     { "heading", Geo.Heading(v) },
+                    { "pitch", Geo.Pitch(v) },
                     { "brakes", v.ActionGroups[KSPActionGroup.Brakes] },
                     { "sas", v.ActionGroups[KSPActionGroup.SAS] }
                 };

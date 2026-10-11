@@ -35,21 +35,26 @@ namespace com.github.lhervier.ksp.mcpserver
                 SetControls);
             yield return new Tool(DriveTool,
                 "Drives the active rover along a heading at a given speed, steering to hold it, then stops with " +
-                "the brakes on and waits for it to be still. Stops after a distance, or when the floating origin " +
+                "the brakes on and waits for it to be still. In reverse, the rover backs away, its front still " +
+                "facing the heading. Stops after a distance, or when the floating origin " +
                 "shifts if until_shift is true, whichever comes first. The rover's front is where its wheels " +
-                "drive it with a positive throttle. Fails, the rover braked, when it tips over, runs away at " +
+                "drive it with a positive throttle. Stalled against a small step, it asks for more speed every " +
+                "three seconds until the rover gets over; stuck with the most it asks, it stops (stoppedBecause " +
+                "stalled). Fails, the rover braked, when it tips over, runs away at " +
                 "twice the speed asked, or when the active vessel changes; stop_drive stops it.",
                 Schema.Object(
                     Schema.P("heading", "number", "degrees from north towards east", true),
                     Schema.P("speed", "number", "metres per second (default 3)"),
                     Schema.P("distance", "number", "metres to drive (default 1000)"),
-                    Schema.P("until_shift", "boolean", "stop as soon as the floating origin shifts")),
+                    Schema.P("until_shift", "boolean", "stop as soon as the floating origin shifts"),
+                    Schema.P("reverse", "boolean", "drive backwards, the front facing the heading (default false)")),
                 Drive);
             yield return new Tool(DriveToTool,
                 "Drives the active rover to a latitude and longitude and stops there with the brakes on, still. " +
                 "Drives forward or in reverse, whichever faces the target; when the target falls behind the " +
                 "rover further than 3 m away, stops and chooses again. Steers less the faster it goes. Stops " +
-                "after 300 s. For a precise stop, start from a few metres away, roughly lined up with the target. " +
+                "after 300 s. Stalled against a small step, it asks for more speed every three seconds until the " +
+                "rover gets over; stuck with the most it asks, it stops (stalled). For a precise stop, start from a few metres away, roughly lined up with the target. " +
                 "Fails, the rover braked, when it tips over, runs away at twice the speed asked, or when the " +
                 "active vessel changes; stop_drive stops it.",
                 Schema.Object(
@@ -199,6 +204,52 @@ namespace com.github.lhervier.ksp.mcpserver
             Wheels.Brakes(v, false);
         }
 
+        /// <summary>
+        /// The speed added to the lowest speed a drive asks for, while the rover is stalled against a small step,
+        /// the lip of a runway say: it grows for every three seconds without progress, until the rover gets over,
+        /// or until it is at its largest and the rover is stuck.
+        /// </summary>
+        private sealed class StallBoost
+        {
+            private double _bestRemaining = double.MaxValue;
+            private float _lastProgress = Time.time;
+
+            /// <summary>The speed added, in metres per second.</summary>
+            public double Value { get; private set; }
+
+            /// <summary>Whether the rover made no progress for three seconds with the largest speed added: what
+            /// stops it is more than the wheels can climb.</summary>
+            public bool Stuck { get; private set; }
+
+            /// <summary>Takes the distance left to drive now, and returns the speed to add.</summary>
+            public double Update(double remaining)
+            {
+                if (remaining < _bestRemaining - 0.05)
+                {
+                    _bestRemaining = remaining;
+                    _lastProgress = Time.time;
+                }
+                else if (Time.time - _lastProgress > 3f)
+                {
+                    Stuck = Value >= MaxBoost;
+                    Value = Math.Min(MaxBoost, Value + 0.3);
+                    _lastProgress = Time.time;
+                }
+                return Value;
+            }
+
+            /// <summary>Starts again from no boost, as after a halt.</summary>
+            public void Reset()
+            {
+                _bestRemaining = double.MaxValue;
+                _lastProgress = Time.time;
+                Value = 0.0;
+                Stuck = false;
+            }
+
+            private const double MaxBoost = 1.5;
+        }
+
         // Ends a drive that did not reach its end: the wheels given back and the brakes on, whatever stopped it.
         private static void Abandon(Vessel v)
         {
@@ -220,11 +271,13 @@ namespace com.github.lhervier.ksp.mcpserver
             double speed = call.Number("speed", 3.0);
             double distance = call.Number("distance", 1000.0);
             bool untilShift = call.Bool("until_shift");
+            bool reverse = call.Bool("reverse");
 
             double startLat = v.latitude, startLon = v.longitude;
             int startShifts = GameState.Shifts;
             DriveWatch watch = new DriveWatch(v, speed);
             HeadingPid pid = new HeadingPid();
+            StallBoost stall = new StallBoost();
             string reason = "distance";
             string trouble = null;
             bool ended = false;
@@ -253,12 +306,19 @@ namespace com.github.lhervier.ksp.mcpserver
 
                     // Slow down as the end comes, so that the brakes stop the rover there rather than tens of
                     // metres on; brake when faster than that.
-                    double along = ForwardSpeed(v);
-                    double wanted = Math.Max(1.0, Math.Min(speed, remaining * 0.35));
+                    double along = reverse ? -ForwardSpeed(v) : ForwardSpeed(v);
+                    double wanted = Math.Max(1.0 + stall.Update(remaining), Math.Min(speed, remaining * 0.35));
+                    if (stall.Stuck)
+                    {
+                        reason = "stalled";
+                        break;
+                    }
                     bool tooFast = along > wanted * 1.2 + 0.3;
                     Wheels.Brakes(v, tooFast);
                     float steer = pid.Steer(Geo.Delta(Heading(v), heading), along, Time.fixedDeltaTime);
-                    Wheels.Hold(tooFast ? 0f : ThrottleFor(wanted, along, false), steer);
+                    // In reverse the wheels turn the other way: the same correction of the front needs the
+                    // opposite command.
+                    Wheels.Hold(tooFast ? 0f : ThrottleFor(wanted, along, reverse), reverse ? -steer : steer);
                     yield return new WaitForFixedUpdate();
                 }
                 if (trouble == null || watch.StillDriving())
@@ -305,9 +365,7 @@ namespace com.github.lhervier.ksp.mcpserver
             bool decided = false;
             int turnRounds = 0;
             double maxSpeed = 0.0;
-            double bestRemaining = double.MaxValue;
-            float lastProgress = Time.time;
-            double stallBoost = 0.0;
+            StallBoost stall = new StallBoost();
             string reason = "time limit";
             string trouble = null;
             double speedAtStop = 0.0;
@@ -355,28 +413,19 @@ namespace com.github.lhervier.ksp.mcpserver
                         }
                         yield return Halt(v);
                         decided = false;
-                        bestRemaining = double.MaxValue;
-                        lastProgress = Time.time;
-                        stallBoost = 0.0;
+                        stall.Reset();
                         continue;
                     }
 
                     double along = reverse ? -ForwardSpeed(v) : ForwardSpeed(v);
                     maxSpeed = Math.Max(maxSpeed, along);
                     float steer = distance > HoldStraightWithin ? SteerFor(error, reverse, Math.Abs(along)) : 0f;
-                    // Stalled against a small step, the lip of a runway say: no progress for three seconds
-                    // raises the lowest speed asked, until the rover gets over it.
-                    if (remaining < bestRemaining - 0.05)
+                    double wanted = Math.Max(0.15 + stall.Update(remaining), Math.Min(topSpeed, remaining * 0.3));
+                    if (stall.Stuck)
                     {
-                        bestRemaining = remaining;
-                        lastProgress = Time.time;
+                        reason = "stalled";
+                        break;
                     }
-                    else if (Time.time - lastProgress > 3f)
-                    {
-                        stallBoost = Math.Min(1.5, stallBoost + 0.3);
-                        lastProgress = Time.time;
-                    }
-                    double wanted = Math.Max(0.15 + stallBoost, Math.Min(topSpeed, remaining * 0.3));
 
                     // Too fast for what is left: brake rather than only cut the throttle, the wheels alone
                     // roll on for metres.

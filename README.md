@@ -36,7 +36,7 @@ then lets go of what it holds, the wheels of a rover say.
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, brakes, SAS, the local time where it is and the length of its body's day |
+| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, SAS, the local time where it is and the length of its body's day |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in, written back as `persistent`; at the space centre, returns once its buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -72,7 +72,7 @@ then lets go of what it holds, the wheels of a rover say.
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
-| `drive` | drives a rover along a heading, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
+| `drive` | drives a rover along a heading, forward or backing away with its front facing it, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
 | `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, and stops there with the brakes on, still; stops and turns round when the target falls behind |
 | `stop_drive` | stops a `drive` or a `drive_to` still running, or the wheels `set_controls` holds, and brakes |
 

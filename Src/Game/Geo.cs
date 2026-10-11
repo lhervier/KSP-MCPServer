@@ -32,6 +32,15 @@ namespace com.github.lhervier.ksp.mcpserver
             return Normalize(Math.Atan2(Vector3d.Dot(forward, east), Vector3d.Dot(forward, north)) * 180.0 / Math.PI);
         }
 
+        /// <summary>The angle of the direction the vessel's control point faces above the local horizon, in
+        /// degrees, as the navball shows it: positive above, 90 straight up.</summary>
+        public static double Pitch(Vessel v)
+        {
+            Vector3d up = (v.CoMD - v.mainBody.position).normalized;
+            double sine = Vector3d.Dot(((Vector3d)v.ReferenceTransform.up).normalized, up);
+            return Math.Asin(Math.Max(-1.0, Math.Min(1.0, sine))) * 180.0 / Math.PI;
+        }
+
         /// <summary>
         /// Where a surface point lies from the vessel: <paramref name="northMetres"/> and
         /// <paramref name="eastMetres"/> along the local axes.
