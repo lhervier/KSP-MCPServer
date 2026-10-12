@@ -3,11 +3,11 @@
 What is left to do on KSP-MCPServer, most urgent first.
 
 - **Check `drive_to` on a tall rover over rough ground**, on the Earth of Real Solar System near Kourou,
-  where `Diag3-Rover` rolled over three times out of four drives (6 m/s once, 3 m/s twice). The control
+  where a rover of 18 parts rolled over three times out of four drives (6 m/s once, 3 m/s twice). The control
   point of that rover faces up: the drives read its speed and heading along an axis that stood upright,
   so they never cut the throttle (seen on Kerbin: 28 m/s for 4 asked). They now drive along the axis the
   wheels drive along, choose forward or reverse again when the target falls behind, steer less above
-  3 m/s, and stop when the rover tips over or runs away; on Kerbin, `Diag3-Rover` now reaches its target
+  3 m/s, and stop when the rover tips over or runs away; on Kerbin, that rover now reaches its target
   at 4, 6 and 10 m/s. Not yet driven near Kourou.
 - **`set_position` over a long jump**: moved from the launchpad of the KSC to the other side of Kerbin
   (latitude 3.165°, longitude −141.128°), a two-part craft crashed through the terrain about a second
@@ -21,7 +21,7 @@ What is left to do on KSP-MCPServer, most urgent first.
   (`angularVelocity` × radius) after turning the rotating frame off (`PrepForOrbitSet`), and
   `PostOrbitSet` may turn it on again: measure the speed over the ground right after the jump, short and
   long.
-  Seen again on Kerbin: `Diag3-Rover` (18 parts) jumped 121 km to the Desert Airfield, then to the flat
+  Seen again on Kerbin: a rover of 18 parts jumped 121 km to the Desert Airfield, then to the flat
   ground 200 m north of it, crashed through the terrain two seconds after arriving, both times; a kerbal
   on EVA made the same jump unharmed. To bring a craft to a launch site, `launch_vessel` with `site` and
   `crew` does it.
@@ -46,5 +46,5 @@ What is left to do on KSP-MCPServer, most urgent first.
 - **Check the stall recovery of `drive_to`** on the lip of the runway deck: approaching a spot on the
   deck from the grass, the rover used to creep at its lowest speed against the lip until the 300 s limit.
   It now raises that speed after three seconds without progress; not yet seen on that lip.
-- **Publish**: create the GitHub repository (`lhervier/KSP-MCPServer`, the address the README and KSP Diag -
-  Terrain Height link to), and a first release with the DLL.
+- **Publish**: create the GitHub repository (`lhervier/KSP-MCPServer`, the address the README and the mods that
+  offer it tools link to), and a first release with the DLL.

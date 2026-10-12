@@ -149,15 +149,13 @@ one at all can declare its own attribute class of that name, with `Name` and `De
 - It may be called while another tool runs, a `drive_to` say: it should do its work at once, as a button
   of a window does.
 
-KSP Diag - Terrain Height and Diag FloatingOrigin offer their Record and Clear buttons this way, the reading of
-their table, and the moving, showing and hiding of their window.
-
 ## Performance
 
-Timed frame by frame in flight with [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler), three
-runs played by hand without this mod and three played by script through it: the coroutines the terrain is
-updated in cost at most about 0.05 ms more per frame by script, and nothing larger stands out of the spread
-between runs.
+Timed frame by frame in flight with [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler), in low
+orbit over the Mun. Installed, and called by nobody, this mod costs a frame nothing measurable: three runs
+played by hand with it and three without it overlap on every row. Played by script through it, a run costs
+at most about 0.05 ms more per frame, in the coroutines the terrain is updated in, than one played by hand
+without it.
 
 **→ Full chapter: [Performance](docs/performance.md)**
 
