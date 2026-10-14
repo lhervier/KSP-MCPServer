@@ -28,11 +28,14 @@ namespace com.github.lhervier.ksp.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("launch_vessel",
-                "Launches a vessel from its .craft file at a launch site, as the editor's Launch button does, with " +
-                "the crew the editor would give it by default or the kerbals named, and waits until physics runs " +
-                "on it. KSP saves the game as 'persistent' first, as it does for any launch. Needs a game loaded. " +
-                "Refuses a craft whose parts are not all unlocked in this game, where the launch dialog of the " +
-                "space centre asks for a confirmation, and a launch site the game does not offer.",
+                "Launches a vessel from its .craft file at a launch site, from the space centre or one of its " +
+                "editors only, as the space centre's launch dialogs or an editor's Launch button do. Boards the crew " +
+                "the editor would give it by default or the kerbals named, and waits until physics runs on it. KSP " +
+                "saves the game as 'persistent' first, as it does for any launch. Refused in any other scene, flight " +
+                "and the main menu included: go to the space centre first (go_to_scene from flight, open_game from " +
+                "the main menu). Refuses a craft whose parts are not all " +
+                "unlocked in this game, where the launch dialog of the space centre asks for a confirmation, and a " +
+                "launch site the game does not offer.",
                 Schema.Object(
                     Schema.P("craft", "string",
                         "the .craft file: absolute, or relative to the Ships folder of the game being played " +
@@ -70,7 +73,8 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool("go_to_scene",
                 "Leaves the flight, or the scene the game is in, for the space centre, the tracking station or " +
                 "the main menu, saving the game as persistent first as the game's own buttons do, and waits until " +
-                "that scene is up.",
+                "that scene is up. Refused at the main menu, which has no game to leave: open_game or new_game " +
+                "open one at the space centre.",
                 Schema.Object(
                     Schema.P("scene", "string", "SPACECENTER, TRACKSTATION or MAINMENU", true)),
                 GoToScene);
@@ -85,8 +89,14 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private static IEnumerator LaunchVessel(ToolCall call)
         {
-            if (!Require.Game(call))
+            // A player launches from the space centre, or from an editor reached through it, never straight from
+            // the main menu or from flight.
+            if (HighLogic.LoadedScene != GameScenes.SPACECENTER && HighLogic.LoadedScene != GameScenes.EDITOR)
             {
+                call.Fail("Vessels are launched from the space centre or its editors, and the game is in " +
+                    HighLogic.LoadedScene + (HighLogic.LoadedScene == GameScenes.MAINMENU
+                        ? ": open a game first with open_game or new_game, which go to the space centre"
+                        : ": go to the space centre first with go_to_scene"));
                 yield break;
             }
             string path = call.String("craft");
@@ -435,7 +445,18 @@ namespace com.github.lhervier.ksp.mcpserver
         private static IEnumerator GoToScene(ToolCall call)
         {
             GameScenes scene;
-            if (!call.Choice("scene", null, Scenes, out scene) || !Require.Game(call))
+            if (!call.Choice("scene", null, Scenes, out scene))
+            {
+                yield break;
+            }
+            // Back at the main menu, KSP still holds the game it left, which a player cannot go back into from there.
+            if (HighLogic.LoadedScene == GameScenes.MAINMENU)
+            {
+                call.Fail("The main menu has no game to leave: open one with open_game or new_game, which go to the " +
+                    "space centre");
+                yield break;
+            }
+            if (!Require.Game(call))
             {
                 yield break;
             }

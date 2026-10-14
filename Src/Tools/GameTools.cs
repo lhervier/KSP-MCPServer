@@ -20,20 +20,21 @@ namespace com.github.lhervier.ksp.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("load_save",
-                "Loads a save into flight, from any scene, as the quickload does (the scenarios of the mods installed since " +
-                "are added), and waits until the active vessel is unpacked and physics runs on it.",
+                "Loads a save into flight, as the quickload does, from the space centre or from flight only (the " +
+                "scenarios of the mods installed since are added), and waits until the active vessel is unpacked and " +
+                "physics runs on it. Refused anywhere else, the main menu included: open the game first with " +
+                "open_game, which goes to the space centre, as a player does.",
                 Schema.Object(
                     Schema.P("folder", "string", "the game's folder under saves/ (default: the game being played)"),
                     Schema.P("save", "string", "the save's name, without .sfs", true)),
                 LoadSave);
             yield return new Tool("open_game",
-                "Opens a game from any scene, the main menu included, as Resume Game does: in the scene it was " +
-                "saved in, the space centre for its persistent save. Like the game, it writes the save back as persistent, " +
-                "with the scenarios of the mods installed since (another save only when it does not start in flight). " +
-                "Waits until that scene is up, and at the space centre until its buildings are set up.",
+                "Opens a game's persistent save, from any scene, the main menu included, as Resume Game does, and " +
+                "always at the space centre, whatever scene the save names. Like the game, it writes the save back as " +
+                "persistent, with the scenarios of the mods installed since. Waits until the space centre is up and " +
+                "its buildings are set up.",
                 Schema.Object(
-                    Schema.P("folder", "string", "the game's folder under saves/", true),
-                    Schema.P("save", "string", "the save's name, without .sfs (default persistent)")),
+                    Schema.P("folder", "string", "the game's folder under saves/", true)),
                 OpenGame);
             yield return new Tool("new_game",
                 "Starts a new game from the main menu, as New Game does with the Normal difficulty and the " +
@@ -60,7 +61,10 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool("play_mission",
                 "Starts a mission of Making History from the main menu, from its start, as Restart then Play of " +
                 "Play Missions do: the game the mission saved is deleted, the mission's own game is set up, its launch sites placed, and the game opens in the scene the " +
-                "mission starts in. Waits until that scene is up. Needs the expansion, and the main menu.",
+                "mission starts in. Waits until that scene is up. Needs the expansion, and the main menu. The only " +
+                "tool that can go from the main menu straight into flight, as the expansion does, without the space " +
+                "centre: a mod may then behave otherwise than in a flight reached through it, as Parallax does with " +
+                "the texture of the ground.",
                 Schema.Object(
                     Schema.P("mission", "string",
                         "the mission's folder: absolute, or its name under the user's Missions folder or the " +
@@ -86,6 +90,16 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private static IEnumerator LoadSave(ToolCall call)
         {
+            // A flight reached straight from the main menu, the space centre never loaded since KSP started, is not
+            // what a player gets: Parallax, for one, then paints the ground of Kerbin with the wrong texture.
+            if (HighLogic.LoadedScene != GameScenes.SPACECENTER && !HighLogic.LoadedSceneIsFlight)
+            {
+                call.Fail("Saves are loaded from the space centre or in flight, as the quickload does, and the game is in " +
+                    HighLogic.LoadedScene + (HighLogic.LoadedScene == GameScenes.MAINMENU
+                        ? ": open the game first with open_game, which goes to the space centre"
+                        : ": go to the space centre first with go_to_scene"));
+                yield break;
+            }
             string folder = call.String("folder", HighLogic.SaveFolder);
             string save = call.String("save");
             // LoadGame also clears the dictionaries of persistent ids, which are internal; the file is read again
@@ -112,49 +126,36 @@ namespace com.github.lhervier.ksp.mcpserver
         private static IEnumerator OpenGame(ToolCall call)
         {
             string folder = call.String("folder");
-            string save = call.String("save", "persistent");
             // Read as GamePersistence.LoadGame reads a save.
-            ConfigNode node = GamePersistence.LoadSFSFile(save, folder);
-            Game game = node != null ? GamePersistence.LoadGameCfg(node, save, true, false) : null;
+            ConfigNode node = GamePersistence.LoadSFSFile("persistent", folder);
+            Game game = node != null ? GamePersistence.LoadGameCfg(node, "persistent", true, false) : null;
             if (game == null)
             {
-                call.Fail("Could not open saves/" + folder + "/" + save + ".sfs");
+                call.Fail("Could not open saves/" + folder + "/persistent.sfs");
                 yield break;
             }
 
-            // What the main menu's Resume Game does. It saves the game back as persistent once the scenarios of the
-            // installed mods are added: the space centre reads persistent from disk (SpaceCenterMain.Start), and
-            // would open the game without them. Another save is written as persistent only when it does not start
-            // in flight, as the quickload does it.
-            Vessel previous = FlightGlobals.ActiveVessel;
+            // What the main menu's Resume Game does. KSP writes every persistent save to open at the space centre;
+            // one copied from a save made in flight would open in flight, which no player gets, hence the scene
+            // forced. The game is saved back as persistent once the scenarios of the installed mods are added: the
+            // space centre reads persistent from disk (SpaceCenterMain.Start), and would open the game without them.
+            game.startScene = GameScenes.SPACECENTER;
             GamePersistence.UpdateScenarioModules(game);
-            if (save == "persistent" || game.startScene != GameScenes.FLIGHT)
-            {
-                GamePersistence.SaveGame(game, "persistent", folder, SaveMode.OVERWRITE);
-            }
+            GamePersistence.SaveGame(game, "persistent", folder, SaveMode.OVERWRITE);
             HighLogic.CurrentGame = game;
             HighLogic.SaveFolder = folder;
             GameEvents.onGameStatePostLoad.Fire(node);
-            if (game.startScene == GameScenes.FLIGHT)
-            {
-                game.Start();
-                yield return Waits.ForNewActiveVessel(call, previous);
-                yield break;
-            }
 
-            // Watched from before the start: the scene asked for may be the one being left, so the scene loaded
-            // now does not tell.
-            SceneWatch watch = SceneWatch.Start(game.startScene);
+            // Watched from before the start: the space centre may be the scene being left, so the scene loaded now
+            // does not tell.
+            SceneWatch watch = SceneWatch.Start(GameScenes.SPACECENTER);
             game.Start();
             yield return Waits.ForScene(call, watch);
             if (call.IsError)
             {
                 yield break;
             }
-            if (HighLogic.LoadedScene == GameScenes.SPACECENTER)
-            {
-                yield return Waits.ForBuildingColliders();
-            }
+            yield return Waits.ForBuildingColliders();
             call.Text(GameState.State());
         }
 

@@ -38,10 +38,6 @@ What is left to do on KSP-MCPServer, most urgent first.
   the KSC only when a game is created at the space centre. Before its launch, the editor also writes the
   launch site it chose as the game's default (`EditorDriver.saveselectedLaunchSite`), which the launch
   dialog of the space centre does not. Not seen since: to play again with KSCSwitcher.
-- **`launch_vessel` from flight with the Mun loaded**: once, KSP gave the launch up
-  (`Cannot find a transform named 'Facility/LaunchPad_spawn'`) and went back to the space centre. The
-  tool now fails as soon as KSP leaves for another scene, in a second; launched again from the orbit of
-  the Mun, the craft reached the pad: what made KSP give up is not known.
 
 - **Check the stall recovery of `drive_to`** on the lip of the runway deck: approaching a spot on the
   deck from the grass, the rover used to creep at its lowest speed against the lip until the 300 s limit.

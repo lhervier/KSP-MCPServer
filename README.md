@@ -34,16 +34,23 @@ and the tools of other mods — run at any time: `get_state` answers while `driv
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
 then lets go of what it holds, the wheels of a rover say.
 
+Flight is reached as a player reaches it: through the space centre. From the main menu, `open_game` and
+`new_game` go to the space centre; from there or one of its editors, `launch_vessel` launches a vessel and `load_save` loads a save,
+which it also reloads in flight. A flight reached straight from the main menu, the space centre never loaded
+since KSP started, is not one a player gets, and a mod may behave otherwise in it: Parallax Continued 1.0.4
+paints the ground of Kerbin with the wrong texture until the space centre has been loaded once. Only
+`play_mission` still goes from the main menu into flight, as Making History does.
+
 | tool | what it does |
 |---|---|
 | `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, SAS, the local time where it is and the length of its body's day |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
-| `open_game` | opens a game from any scene, the main menu included, as *Resume Game* does: in the scene it was saved in, written back as `persistent`; at the space centre, returns once its buildings are set up |
+| `open_game` | opens a game's `persistent` save from any scene, the main menu included, as *Resume Game* does: always at the space centre, written back as `persistent`; returns once the buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
-| `play_mission` | starts a mission of Making History from the main menu, from its start, as *Restart* then *Play* of *Play Missions* do: in the scene the mission starts in |
-| `load_save` | loads a save into flight, from any scene, as the quickload does |
+| `play_mission` | starts a mission of Making History from the main menu, from its start, as *Restart* then *Play* of *Play Missions* do: in the scene the mission starts in, flight included, the one way into flight that skips the space centre |
+| `load_save` | loads a save into flight, as the quickload does, from the space centre or from flight only |
 | `save_game` | saves the game as it is now under a name, as a quicksave does |
-| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, with the crew the editor would give it or the kerbals named, their inventories emptied or not, as the editor's Launch button does; refuses a launch site the game does not offer, and a craft with parts not yet unlocked, or too heavy, too large or of too many parts for the level of its site and its editor |
+| `launch_vessel` | launches a vessel from its `.craft` file at a launch site, from the space centre or one of its editors only, with the crew the editor would give it or the kerbals named, their inventories emptied or not, as the editor's Launch button does; refuses a launch site the game does not offer, and a craft with parts not yet unlocked, or too heavy, too large or of too many parts for the level of its site and its editor |
 | `list_launch_sites` | the launch sites a vessel can be launched at, as the editors' launch site selector offers them: the name `launch_vessel` takes, the name shown, the editor, the body, what places the site (the space centre, a `PQSCity` or a `PQSCity2`), and where its first spawn point lies |
 | `list_vessels` | the vessels of the game: id, name, situation, loaded or not, packed or not, active or target, distance from the active vessel |
 | `switch_vessel` | makes a vessel the active one: a loaded one as the switch vessel keys `[` and `]` do, one far away as *Switch To* of the map view does |
@@ -64,7 +71,7 @@ then lets go of what it holds, the wheels of a rover say.
 | `revert_to_launch` | reverts the flight to its launch, as *Revert to Launch* does |
 | `revert_to_editor` | reverts the flight to the Vehicle Assembly Building or the Space Plane Hangar, as *Revert to* does |
 | `recover_vessel` | recovers the active vessel, as the *Recover* button does, and waits for the recovery report |
-| `go_to_scene` | leaves for the space centre, the tracking station or the main menu, saving the game first as the game's own buttons do |
+| `go_to_scene` | leaves for the space centre, the tracking station or the main menu, saving the game first as the game's own buttons do; not from the main menu |
 | `fly_vessel` | flies a vessel of the player's from the tracking station, as its *Fly* button does |
 | `open_facility` | clicks a building of the space centre: its editor, its scene or its screen opens |
 | `facility_menu` | opens a building's menu at the space centre, as a right click does, and reads it: level, damage, costs, funds; presses its *Upgrade* or *Repair* button and waits until KSP is done |
