@@ -26,6 +26,13 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("vessel", "string",
                         "the vessel's id, or its name when no other vessel bears it; left out, clears the target")),
                 SetTarget);
+            yield return new Tool("go_eva",
+                "Sends a crew member of the active vessel out on EVA, as the EVA button of the crew portrait does, " +
+                "and waits until the kerbal is the active vessel and physics runs on it. Fails when KSP lets no one " +
+                "out (no hatch, the hatch obstructed...).",
+                Schema.Object(
+                    Schema.P("kerbal", "string", "the crew member's name (default: the first one aboard)")),
+                GoEva);
             yield return new Tool("set_cheats",
                 "Turns on or off the cheats of the Alt+F12 menu given; those left out are kept. Answers with " +
                 "their state.",
@@ -153,6 +160,50 @@ namespace com.github.lhervier.ksp.mcpserver
             FlightGlobals.fetch.SetVesselTarget(vessel, true);
             yield return null;
             call.Text("target: " + vessel.vesselName + " (" + vessel.id + ")");
+        }
+
+        private static IEnumerator GoEva(ToolCall call)
+        {
+            if (!Require.Flight(call))
+            {
+                yield break;
+            }
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            ProtoCrewMember crew = null;
+            foreach (ProtoCrewMember member in vessel.GetVesselCrew())
+            {
+                if (!call.Has("kerbal") || member.name == call.String("kerbal"))
+                {
+                    crew = member;
+                    break;
+                }
+            }
+            if (crew == null)
+            {
+                call.Fail(call.Has("kerbal") ? call.String("kerbal") + " is not aboard " + vessel.vesselName
+                    : "No one is aboard " + vessel.vesselName);
+                yield break;
+            }
+            if (crew.KerbalRef == null)
+            {
+                call.Fail(crew.name + " has no seat model loaded: KSP cannot send them out");
+                yield break;
+            }
+            // What the EVA button of the portrait does (KerbalPortrait.ClickEVA).
+            CameraManager.Instance.SetCameraFlight();
+            if (FlightEVA.SpawnEVA(crew.KerbalRef) == null)
+            {
+                call.Fail("KSP let " + crew.name + " out of no hatch");
+                yield break;
+            }
+            yield return Waits.Until(call, () => FlightGlobals.ActiveVessel != null
+                    && FlightGlobals.ActiveVessel.isEVA && FlightGlobals.ActiveVessel.vesselName == crew.name
+                    && !FlightGlobals.ActiveVessel.packed,
+                60f, crew.name + " was not the active vessel a minute after leaving");
+            if (!call.IsError)
+            {
+                call.Text(GameState.State());
+            }
         }
 
         private static IEnumerator SetCheats(ToolCall call)
