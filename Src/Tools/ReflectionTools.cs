@@ -44,11 +44,14 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("match", "string", MatchDescription)),
                 SetMember) { Concurrent = true };
             yield return new Tool("call_method",
-                "Calls a method without arguments of the first loaded object of a type, or a static one, and " +
-                "returns what it returns.",
+                "Calls a method of the first loaded object of a type, or a static one, and returns what it " +
+                "returns. Without arguments, the method that takes none; with arguments, the first method of that " +
+                "name that takes as many, each argument converted to its parameter's type (numbers, strings, " +
+                "booleans, enums, and {x, y, z} for a Vector3).",
                 Schema.Object(
                     Schema.P("type", "string", "type name, full or short", true),
                     Schema.P("method", "string", "method name", true),
+                    Schema.P("arguments", "array", "the arguments, in order"),
                     Schema.P("match", "string", MatchDescription)),
                 CallMethod) { Concurrent = true };
         }
@@ -292,19 +295,28 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail("Unknown type " + call.String("type"));
                 yield break;
             }
+            List<object> arguments = call.Arguments.TryGetValue("arguments", out object given) && given is List<object> list
+                ? list
+                : new List<object>();
             MethodInfo method = type.GetMethods(AnyMember)
-                .FirstOrDefault(m => m.Name == call.String("method") && m.GetParameters().Length == 0);
+                .FirstOrDefault(m => m.Name == call.String("method") && m.GetParameters().Length == arguments.Count);
             object target;
             if (method == null)
             {
-                call.Fail("No method " + call.String("method") + "() in " + type.FullName);
+                call.Fail("No method " + call.String("method") + " with " + arguments.Count + " parameters in " + type.FullName);
                 yield break;
             }
             if (!Target(call, type, method, out target))
             {
                 yield break;
             }
-            object result = method.Invoke(target, null);
+            ParameterInfo[] parameters = method.GetParameters();
+            object[] values = new object[arguments.Count];
+            for (int i = 0; i < values.Length; i++)
+            {
+                values[i] = FromJson(arguments[i], parameters[i].ParameterType);
+            }
+            object result = method.Invoke(target, values);
             call.Text(new Dictionary<string, object> { { "returned", ToJson(result, 2) } });
         }
 

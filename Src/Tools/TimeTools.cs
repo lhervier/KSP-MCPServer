@@ -38,6 +38,14 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("ut", "number", "the universal time to warp to, in seconds"),
                     Schema.P("seconds", "number", "instead of ut: how long to warp for, in seconds of game time")),
                 WarpTo);
+            yield return new Tool("warp_to_morning",
+                "Warps to the next morning where the active vessel is, as the button of the time warp gauge does " +
+                "for a vessel on the ground: KSP's dawn, plus a minute. With local_time, to that time of the local " +
+                "solar day instead (0 midnight, 0.5 noon). Waits until KSP is back to normal time, and gives the " +
+                "local time before and after.",
+                Schema.Object(Schema.P("local_time", "number",
+                    "the time of the local solar day to warp to, 0 to 1 (default: KSP's dawn, 0.3, plus a minute)")),
+                WarpToMorning);
             yield return new Tool("set_pause",
                 "Pauses or resumes the flight, as Escape does, without the menu.",
                 Schema.Object(Schema.P("paused", "boolean", "true to pause", true)),
@@ -129,6 +137,63 @@ namespace com.github.lhervier.ksp.mcpserver
                 call.Fail("ut or seconds: a time ahead of the game's, which is " + now);
                 yield break;
             }
+            IEnumerator run = RunWarp(call, warp, ut);
+            while (run.MoveNext())
+            {
+                yield return run.Current;
+            }
+            if (!call.IsError)
+            {
+                call.Text(GameState.State());
+            }
+        }
+
+        private static IEnumerator WarpToMorning(ToolCall call)
+        {
+            TimeWarp warp = TimeWarp.fetch;
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            if (!HighLogic.LoadedSceneIsFlight || warp == null || vessel == null || Sun.Instance == null)
+            {
+                call.Fail("Not in flight, or no sun");
+                yield break;
+            }
+            CelestialBody body = vessel.mainBody;
+            double before = Sun.Instance.GetLocalTimeAtPosition(vessel.latitude, vessel.longitude, body);
+            // The length of the solar day, as UIWarpToNextMorning computes it: the body's turn, lengthened by its
+            // motion along its orbit
+            double day = body.rotationPeriod;
+            if (body.orbit != null && body.orbit.period - day > 0.01)
+            {
+                day = body.orbit.period * day / (body.orbit.period - day);
+            }
+            double seconds = call.Has("local_time")
+                ? day * UtilMath.WrapAround(call.Number("local_time") - before, 0.0, 1.0)
+                : day * UtilMath.WrapAround(KSP.UI.UIWarpToNextMorning.timeOfDawn - before, 0.0, 1.0) + 60.0;
+            if (seconds < 1.0)
+            {
+                call.Text(new Dictionary<string, object> { { "localTimeBefore", before }, { "localTimeAfter", before } });
+                yield break;
+            }
+            IEnumerator run = RunWarp(call, warp, Planetarium.GetUniversalTime() + seconds);
+            while (run.MoveNext())
+            {
+                yield return run.Current;
+            }
+            if (!call.IsError)
+            {
+                Dictionary<string, object> answer = GameState.State();
+                answer["localTimeBefore"] = before;
+                answer["localTimeAfter"] = Sun.Instance.GetLocalTimeAtPosition(vessel.latitude, vessel.longitude, body);
+                call.Text(answer);
+            }
+        }
+
+        /// <summary>
+        /// Warps to <paramref name="ut"/> as Warp To does, and waits until KSP is back to normal time. Fails
+        /// <paramref name="call"/> when the warp is still running after 10 minutes, after stopping it.
+        /// </summary>
+        private static IEnumerator RunWarp(ToolCall call, TimeWarp warp, double ut)
+        {
             warp.WarpTo(ut);
 
             // KSP starts the warp at its next frame, and ends it once back to normal time; it gives up on its
@@ -157,7 +222,6 @@ namespace com.github.lhervier.ksp.mcpserver
                     warp.CancelAutoWarp();
                 }
             }
-            call.Text(GameState.State());
         }
 
         private static IEnumerator SetPause(ToolCall call)

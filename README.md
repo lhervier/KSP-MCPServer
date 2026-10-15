@@ -62,6 +62,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_time` | sets the universal time of the game: the time of day at a spot |
 | `set_warp` | sets the time warp, on rails or in physics warp, as the `.` and `,` keys do, with Alt or without |
 | `warp_to` | warps to a universal time, as *Warp To* of a manoeuvre node or of the map view does |
+| `warp_to_morning` | warps to the next morning where the active vessel is, as the button of the time warp gauge does, or to another time of the local solar day |
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
 | `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |
@@ -87,7 +88,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 A drive stops, the rover braked, when it tips over, when it runs away at twice the speed asked, when the
 active vessel changes or when the flight ends.
 | `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components |
-| `call_method` | calls a method without arguments of a loaded object of any mod |
+| `call_method` | calls a method of a loaded object of any mod, or a static one, with or without arguments |
 
 These three take the first loaded object of the type, or with `match` (`path=value`) the first one whose path reads that value.
 
