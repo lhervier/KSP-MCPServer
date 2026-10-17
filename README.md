@@ -117,6 +117,31 @@ It listens on `127.0.0.1` only: nothing outside the computer KSP runs on can rea
 claude mcp add --transport http ksp http://127.0.0.1:8770/mcp/
 ```
 
+The server stops with KSP. An assistant connected over HTTP tries to reconnect for a few seconds only, which is
+less than KSP takes to start again: after each restart of KSP, the connection has to be made again by hand
+(in Claude Code, `/mcp`).
+
+**Through the stdio bridge**, the connection survives the restarts of KSP.
+[`bridge/stdio-bridge.py`](bridge/stdio-bridge.py), a Python script with no dependency, is started by the
+assistant and passes each request on to the server. While KSP is not running, the tools of the game stay
+listed (the last ones seen) and calling one answers that KSP is not running; when KSP is back, or comes back
+with other mods, the assistant gets the new list. It adds three tools of its own, which work without KSP:
+
+| tool | what it does |
+|---|---|
+| `ksp_status` | whether KSP is running, whether its server answers, and the scene of the game |
+| `ksp_start` | starts KSP from one of the folders given with `--ksp`, and waits for the main menu; `keep_log` copies the previous `KSP.log` first, as KSP overwrites it when it starts |
+| `ksp_quit` | quits KSP, waits until it has ended, and can copy its `KSP.log` |
+
+`ksp_start` starts only the folders given with `--ksp`, each under a name of your choice. With Claude Code:
+
+```
+claude mcp add ksp -- python <path>/bridge/stdio-bridge.py --ksp dev=<path of a KSP folder>
+```
+
+The bridge is a convenience for exploring the game with an assistant: a script that plays a protocol should
+post to the server itself, as below, and not need it.
+
 **With anything else.** Each tool is a JSON-RPC call, posted to the same address:
 
 ```
