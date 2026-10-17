@@ -28,6 +28,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import kspwindow
+
 DEFAULT_URL = "http://127.0.0.1:8770/mcp/"
 PROBE_PERIOD = 5
 PROBE_TIMEOUT = 5
@@ -99,7 +101,7 @@ def ksp_running():
 
 def launch(folder, arguments):
     """Starts KSP from folder, with the given command-line arguments, so that it keeps running after this
-    script ends. Raises RuntimeError when the folder holds no KSP executable."""
+    script ends, and returns its process. Raises RuntimeError when the folder holds no KSP executable."""
     for name in EXECUTABLES:
         executable = os.path.join(folder, name)
         if os.path.isfile(executable):
@@ -109,16 +111,15 @@ def launch(folder, arguments):
     options = {"cwd": folder, "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
                "stderr": subprocess.DEVNULL, "close_fds": True}
     if os.name != "nt":
-        subprocess.Popen([executable] + arguments, start_new_session=True, **options)
-        return
+        return subprocess.Popen([executable] + arguments, start_new_session=True, **options)
     # Out of the client's process group, and out of its job when the job lets it, so that closing the client
     # does not close KSP with it.
     flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
-        subprocess.Popen([executable] + arguments, creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB,
-                         **options)
+        return subprocess.Popen([executable] + arguments,
+                                creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, **options)
     except OSError:
-        subprocess.Popen([executable] + arguments, creationflags=flags, **options)
+        return subprocess.Popen([executable] + arguments, creationflags=flags, **options)
 
 
 def canonical(tools):
@@ -302,13 +303,19 @@ class Bridge:
         tools["ksp_start"] = (
             "Starts KSP from one of the folders this bridge was given, and by default waits until the game is at "
             "its main menu. Refused while a KSP runs. KSP.log is overwritten when KSP starts: keep_log copies the "
-            "previous one first.",
+            "previous one first. window_x moves the window of KSP (Windows only, not in full screen) as soon as it "
+            "shows.",
             schema({"install": {"type": "string", "enum": names, "description": "which KSP folder"},
                     "arguments": {"type": "array", "items": {"type": "string"},
                                   "description": "command-line arguments for KSP, such as -popupwindow"},
                     "keep_log": {"type": "string", "description": "a file to copy the previous KSP.log to"},
                     "wait": {"type": "boolean", "description": "wait for the main menu (default true)"},
-                    "timeout": {"type": "number", "description": "seconds to wait for the main menu (default 540)"}},
+                    "timeout": {"type": "number", "description": "seconds to wait for the main menu (default 540)"},
+                    "window_x": {"type": "integer",
+                                 "description": "pixels between the left edge of the work area of the primary "
+                                                "screen and the left edge of the window of KSP, 0 to stick it to "
+                                                "the left; its height on the screen and its size do not change "
+                                                "(default: where Windows puts it)"}},
                    ["install"]),
             self.start)
         tools["ksp_quit"] = (
@@ -360,8 +367,14 @@ class Bridge:
         previous = os.path.join(folder, "KSP.log")
         if arguments.get("keep_log") and os.path.isfile(previous):
             copy(previous, arguments["keep_log"])
-        launch(folder, list(arguments.get("arguments") or []))
+        process = launch(folder, list(arguments.get("arguments") or []))
         self.started = install
+        placed = []
+        if arguments.get("window_x") is not None:
+            def report(line):
+                log(line)
+                placed.append(line)
+            kspwindow.place_window_later(process.pid, int(arguments["window_x"]), report)
         if arguments.get("wait") is False:
             return "KSP started from " + folder
         began = time.time()
@@ -374,7 +387,9 @@ class Bridge:
                 if self.server.call("get_state", timeout=PROBE_TIMEOUT).get("scene") == "MAINMENU":
                     # Read the tools now, rather than at the next check, so that the client has them on return.
                     self.game_seen(self.server.tools())
-                    return "KSP started from %s; main menu after %.0f s" % (folder, time.time() - began)
+                    # The window shows long before the main menu: its line is there by now.
+                    text = "KSP started from %s; main menu after %.0f s" % (folder, time.time() - began)
+                    return text + "".join("; " + line for line in placed)
             except (Unreachable, RuntimeError):
                 pass
         raise RuntimeError("no main menu after %.0f s; KSP is still running" % limit)

@@ -122,15 +122,15 @@ less than KSP takes to start again: after each restart of KSP, the connection ha
 (in Claude Code, `/mcp`).
 
 **Through the stdio bridge**, the connection survives the restarts of KSP.
-[`bridge/stdio-bridge.py`](bridge/stdio-bridge.py), a Python script with no dependency, is started by the
-assistant and passes each request on to the server. While KSP is not running, the tools of the game stay
-listed (the last ones seen) and calling one answers that KSP is not running; when KSP is back, or comes back
-with other mods, the assistant gets the new list. It adds three tools of its own, which work without KSP:
+[`bridge/stdio-bridge.py`](bridge/stdio-bridge.py), a Python script with no dependency outside its folder, is
+started by the assistant and passes each request on to the server. While KSP is not running, the tools of
+the game stay listed (the last ones seen) and calling one answers that KSP is not running; when KSP is back,
+or comes back with other mods, the assistant gets the new list. It adds three tools of its own, which work without KSP:
 
 | tool | what it does |
 |---|---|
 | `ksp_status` | whether KSP is running, whether its server answers, and the scene of the game |
-| `ksp_start` | starts KSP from one of the folders given with `--ksp`, and waits for the main menu; `keep_log` copies the previous `KSP.log` first, as KSP overwrites it when it starts |
+| `ksp_start` | starts KSP from one of the folders given with `--ksp`, and waits for the main menu; `keep_log` copies the previous `KSP.log` first, as KSP overwrites it when it starts; on Windows, `window_x` moves the window of KSP sideways as soon as it shows (0 sticks it to the left of the screen), as KSP always opens it in the middle |
 | `ksp_quit` | quits KSP, waits until it has ended, and can copy its `KSP.log` |
 
 `ksp_start` starts only the folders given with `--ksp`, each under a name of your choice. With Claude Code:
