@@ -1,6 +1,6 @@
 Output/
 obj/
 GameData/KSPMCPServer/*.dll
-GameData/KSPMCPServer/*.zip
+GameData/**/*.zip
 CLAUDE.md
 __pycache__/
