@@ -66,7 +66,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
 | `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |
-| `set_position` | moves the active vessel just above a point of a body, as *Set Position* of the `Alt+F12` menu does, pitch included, and answers once it has settled on the ground; refuses a point where another vessel lies |
+| `set_position` | moves the active vessel to a point of a body, as *Set Position* of the `Alt+F12` menu does, in the attitude it had against its local horizon (or turned to a heading): holds it still a few metres up until the ground and what stands on it are built under it, lowers it to a given height above whatever lies under it, lets it go, and answers once it has settled; refuses a point where it would reach another vessel |
 | `get_terrain` | the terrain of a body at a point: its height, whether the sea covers it, its slope and roughness |
 | `set_orbit` | puts the active vessel on an orbit, as *Set Orbit* of the `Alt+F12` menu does |
 | `revert_to_launch` | reverts the flight to its launch, as *Revert to Launch* does |

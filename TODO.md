@@ -9,22 +9,15 @@ What is left to do on KSP-MCPServer, most urgent first.
   wheels drive along, choose forward or reverse again when the target falls behind, steer less above
   3 m/s, and stop when the rover tips over or runs away; on Kerbin, that rover now reaches its target
   at 4, 6 and 10 m/s. Not yet driven near Kourou.
-- **`set_position` over a long jump**: moved from the launchpad of the KSC to the other side of Kerbin
-  (latitude 3.165°, longitude −141.128°), a two-part craft crashed through the terrain about a second
-  after being unpacked, three times out of three, with and without Terrain Precision Fix. The ground of
-  the arrival likely has no collider yet when physics resumes. Tried, and taken back: setting the vessel
-  1,000 m above the point, waiting until a ray cast down meets terrain that stays put for a second, then
-  setting it down (with or without the ease of the menu). It still went through the ground near Kourou in
-  Real Solar System, and once set down it read a speed over the ground of 462 m/s, the speed of Earth's
-  turning at the equator, while it stood still: the velocity the jump gives it looks wrong, not the
-  ground. `FlightGlobals.SetVesselPosition` gives the vessel the velocity of the turning ground
-  (`angularVelocity` × radius) after turning the rotating frame off (`PrepForOrbitSet`), and
-  `PostOrbitSet` may turn it on again: measure the speed over the ground right after the jump, short and
-  long.
-  Seen again on Kerbin: a rover of 18 parts jumped 121 km to the Desert Airfield, then to the flat
-  ground 200 m north of it, crashed through the terrain two seconds after arriving, both times; a kerbal
-  on EVA made the same jump unharmed. To bring a craft to a launch site, `launch_vessel` with `site` and
-  `crew` does it.
+- **`set_position` over a long jump, in Real Solar System and with a large rover**: the vessel crashed
+  through the terrain after a long jump, on Kerbin and near Kourou in Real Solar System. Two causes, both
+  fixed: the ground of the arrival had no collider yet when physics resumed, and the vessel was let go
+  with the speed of the turning ground (54 m/s at 72° of latitude on Kerbin, 462 m/s at the equator of the
+  Earth), where the scene turns with the body and the ground stands still in it. `set_position` now holds
+  the vessel still until the quad under it is of the finest level and what lies under it reads the same for
+  a second, then lowers it to a few centimetres and lets it go; a capsule on a tank jumped from the KSC to
+  72° N unharmed. Still to try: near Kourou in Real Solar System, and the rover of 18 parts that crashed
+  twice at the Desert Airfield.
 - **EVA and EVA construction tools**, so that a protocol that places parts no longer needs a player's
   hands (anchors on a static, for Terrain Precision Fix): `eva` (a kerbal out of a crewed part, by
   `FlightEVA.spawnEVA`: public, simple); placing a part from a kerbal's inventory on the ground (the
