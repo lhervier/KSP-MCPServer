@@ -11,7 +11,8 @@ on to the server of KSP-MCPServer, over HTTP, and gives back its answer. It live
 - every few seconds it checks the server, and when the list of tools changes (KSP started, or started with
   other mods), it tells the client, which reads the list again;
 - it adds tools of its own, which work while KSP is not running: ksp_status, and, for the KSP folders given
-  with --ksp (and no other), ksp_start and ksp_quit.
+  with --ksp (and no other), ksp_start and ksp_quit. Without --ksp, the folder of the environment variable
+  KSPDIR, when it is set, is the one KSP folder, named KSPDIR.
 
 It is meant for exploring the game by hand with an AI assistant. A script that plays a protocol posts to the
 server over HTTP itself, and must not need this bridge or its tools.
@@ -432,7 +433,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--url", default=DEFAULT_URL, help="the address of the server (default %(default)s)")
     parser.add_argument("--ksp", action="append", default=[], metavar="NAME=FOLDER",
-                        help="a KSP folder ksp_start may start, under a name of your choice; repeat for several")
+                        help="a KSP folder ksp_start may start, under a name of your choice; repeat for several "
+                             "(default: the folder of the environment variable KSPDIR, named KSPDIR)")
     parser.add_argument("--cache", help="the file that keeps the last tools listed by the server")
     options = parser.parse_args()
 
@@ -442,6 +444,8 @@ def main():
         if not sep or not name or not folder:
             parser.error("--ksp wants NAME=FOLDER, got " + item)
         installs[name] = os.path.abspath(folder)
+    if not installs and os.environ.get("KSPDIR"):
+        installs["KSPDIR"] = os.path.abspath(os.environ["KSPDIR"])
     cache = options.cache
     if cache is None:
         base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".cache")

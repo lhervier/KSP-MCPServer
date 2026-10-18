@@ -18,6 +18,17 @@ namespace com.github.lhervier.ksp.mcpserver
             east = (body.GetWorldSurfacePosition(v.latitude, v.longitude + step, v.altitude) - here).normalized;
         }
 
+        /// <summary>The local frame at a point of a body, as a rotation: its forward is the local north, its up the
+        /// local vertical.</summary>
+        public static Quaternion LocalFrame(CelestialBody body, double latitude, double longitude, double altitude)
+        {
+            const double step = 1e-4;
+            Vector3d here = body.GetWorldSurfacePosition(latitude, longitude, altitude);
+            Vector3d up = (here - body.position).normalized;
+            Vector3d north = Vector3d.Exclude(up, body.GetWorldSurfacePosition(latitude + step, longitude, altitude) - here);
+            return Quaternion.LookRotation(north.normalized, up);
+        }
+
         /// <summary>The direction the vessel's control point faces, in degrees from north towards east.</summary>
         public static double Heading(Vessel v)
         {

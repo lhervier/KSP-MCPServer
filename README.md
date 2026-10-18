@@ -139,6 +139,9 @@ or comes back with other mods, the assistant gets the new list. It adds three to
 claude mcp add ksp -- python <path>/bridge/stdio-bridge.py --ksp dev=<path of a KSP folder>
 ```
 
+Without `--ksp`, the folder of the environment variable `KSPDIR`, when it is set, is the one folder
+`ksp_start` may start, under the name `KSPDIR`.
+
 The bridge is a convenience for exploring the game with an assistant: a script that plays a protocol should
 post to the server itself, as below, and not need it.
 
