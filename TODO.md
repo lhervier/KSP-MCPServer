@@ -6,9 +6,12 @@ What is left to do on KSP-MCPServer, most urgent first.
   where a rover of 18 parts rolled over three times out of four drives (6 m/s once, 3 m/s twice). The control
   point of that rover faces up: the drives read its speed and heading along an axis that stood upright,
   so they never cut the throttle (seen on Kerbin: 28 m/s for 4 asked). They now drive along the axis the
-  wheels drive along, choose forward or reverse again when the target falls behind, steer less above
-  3 m/s, and stop when the rover tips over or runs away; on Kerbin, that rover now reaches its target
-  at 4, 6 and 10 m/s. Not yet driven near Kourou.
+  wheels drive along, choose forward or reverse again when the target falls behind, and stop when the
+  rover tips over or runs away; on Kerbin, that rover now reaches its target at 4, 6 and 10 m/s. Not yet
+  driven near Kourou. Since then, the steering learns how sharply the rover turns, slows down for a sharp
+  turn and never asks for more than a quarter of the local gravity sideways: on Kerbin, the small
+  Diag2-Rover, which rolled over turning 90° at 15 m/s, now takes that turn on its wheels. To try with the
+  rover of 18 parts, whose centre of mass stands higher.
 - **`set_position` over a long jump, in Real Solar System and with a large rover**: the vessel crashed
   through the terrain after a long jump, on Kerbin and near Kourou in Real Solar System. Two causes, both
   fixed: the ground of the arrival had no collider yet when physics resumed, and the vessel was let go

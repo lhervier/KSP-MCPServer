@@ -82,7 +82,11 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
 | `drive` | drives a rover along a heading, forward or backing away with its front facing it, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
-| `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, and stops there with the brakes on, still; stops and turns round when the target falls behind |
+| `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, along the straight line from where it starts, and stops there with the brakes on, still; stops and turns round when the target falls behind |
+
+Both drives slow down to take a sharp turn and never turn harder than keeps the rover on its wheels. How
+sharply a rover turns at each speed they learn as they drive, and remember for that vessel until the game
+is closed.
 | `stop_drive` | stops a `drive` or a `drive_to` still running, or the wheels `set_controls` holds, and brakes |
 
 A drive stops, the rover braked, when it tips over, when it runs away at twice the speed asked, when the

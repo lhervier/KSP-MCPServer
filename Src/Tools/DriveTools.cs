@@ -15,9 +15,13 @@ namespace com.github.lhervier.ksp.mcpserver
         private const string DriveTool = "drive";
         private const string DriveToTool = "drive_to";
 
-        // Within this distance of its target, drive_to steers no more: steering then only makes the rover
-        // wander around the point. A target behind the rover counts as reached within it.
-        private const double HoldStraightWithin = 3.0;
+        // A target behind the rover counts as reached within this distance: further, drive_to stops and turns
+        // round.
+        private const double ReachedWithin = 3.0;
+
+        // What drive and drive_to tell of their steering.
+        private const string LearnsTurning = "How sharply the rover turns at each speed it learns as it drives, " +
+            "and remembers for that vessel until the game is closed.";
 
         // Times drive_to stops to choose its direction again before giving up.
         private const int MaxTurnRounds = 4;
@@ -38,9 +42,10 @@ namespace com.github.lhervier.ksp.mcpserver
                 "the brakes on and waits for it to be still. In reverse, the rover backs away, its front still " +
                 "facing the heading. Stops after a distance, or when the floating origin " +
                 "shifts if until_shift is true, whichever comes first. The rover's front is where its wheels " +
-                "drive it with a positive throttle. Stalled against a small step, it asks for more speed every " +
-                "three seconds until the rover gets over; stuck with the most it asks, it stops (stoppedBecause " +
-                "stalled). Fails, the rover braked, when it tips over, runs away at " +
+                "drive it with a positive throttle. Far off the heading, it slows down to turn; it never turns " +
+                "harder than keeps it on its wheels. " + LearnsTurning + " Stalled against a small step, it asks " +
+                "for more speed every three seconds until the rover gets over; stuck with the most it asks, it " +
+                "stops (stoppedBecause stalled). Fails, the rover braked, when it tips over, runs away at " +
                 "twice the speed asked, or when the active vessel changes; stop_drive stops it.",
                 Schema.Object(
                     Schema.P("heading", "number", "degrees from north towards east", true),
@@ -52,8 +57,9 @@ namespace com.github.lhervier.ksp.mcpserver
             yield return new Tool(DriveToTool,
                 "Drives the active rover to a latitude and longitude and stops there with the brakes on, still. " +
                 "Drives forward or in reverse, whichever faces the target; when the target falls behind the " +
-                "rover further than 3 m away, stops and chooses again. Steers less the faster it goes. Stops " +
-                "after 300 s. Stalled against a small step, it asks for more speed every three seconds until the " +
+                "rover further than 3 m away, stops and chooses again. Follows the straight line from where it " +
+                "chose to the target. Far off that line's direction, it slows down to turn; it never turns harder " +
+                "than keeps it on its wheels. " + LearnsTurning + " Stops after 300 s. Stalled against a small step, it asks for more speed every three seconds until the " +
                 "rover gets over; stuck with the most it asks, it stops (stalled). For a precise stop, start from a few metres away, roughly lined up with the target. " +
                 "Fails, the rover braked, when it tips over, runs away at twice the speed asked, or when the " +
                 "active vessel changes; stop_drive stops it.",
@@ -118,22 +124,12 @@ namespace com.github.lhervier.ksp.mcpserver
             call.Text(state);
         }
 
-        // Steering towards a heading error, in degrees: proportional, saturated at 25 degrees, and at a
-        // smaller command above 3 m/s, where the same command turns the rover harder. Positive wheelSteer turns
-        // left, so a target to the right (positive error) needs a negative command; in reverse the wheels turn
-        // the other way.
-        private static float SteerFor(double errorDegrees, bool reverse, double speed)
+        // The highest speed at which to take a heading error of this many degrees: a rover far off its
+        // direction slows down, to turn on a tighter circle and stay on its wheels.
+        private static double SpeedForTurn(double errorDegrees, double speed)
         {
-            float limit = speed <= 3.0 ? 1f : (float)(3.0 / speed);
-            float steer = Mathf.Clamp((float)(-errorDegrees / 25.0), -limit, limit);
-            return reverse ? -steer : steer;
-        }
-
-        // Throttle to bring the speed along the direction of travel to the wanted one.
-        private static float ThrottleFor(double wanted, double actual, bool reverse)
-        {
-            float throttle = Mathf.Clamp((float)((wanted - actual) * 0.5 + wanted * 0.15), 0f, 1f);
-            return reverse ? -throttle : throttle;
+            double cosine = Math.Cos(Math.Min(90.0, Math.Abs(errorDegrees)) * Math.PI / 180.0);
+            return Math.Max(Math.Min(speed, 1.5), speed * Math.Max(0.2, cosine));
         }
 
         // The direction a positive wheel throttle drives the rover in, in world space. The wheel motors drive
@@ -276,7 +272,8 @@ namespace com.github.lhervier.ksp.mcpserver
             double startLat = v.latitude, startLon = v.longitude;
             int startShifts = GameState.Shifts;
             DriveWatch watch = new DriveWatch(v, speed);
-            HeadingPid pid = new HeadingPid();
+            RoverSteering steering = new RoverSteering(v, reverse);
+            SpeedHold speedHold = new SpeedHold();
             StallBoost stall = new StallBoost();
             string reason = "distance";
             string trouble = null;
@@ -307,18 +304,20 @@ namespace com.github.lhervier.ksp.mcpserver
                     // Slow down as the end comes, so that the brakes stop the rover there rather than tens of
                     // metres on; brake when faster than that.
                     double along = reverse ? -ForwardSpeed(v) : ForwardSpeed(v);
-                    double wanted = Math.Max(1.0 + stall.Update(remaining), Math.Min(speed, remaining * 0.35));
+                    // The front faces the heading: in reverse, the direction of travel is the opposite one.
+                    double error = Geo.Delta(Heading(v), heading);
+                    double wanted = Math.Max(1.0 + stall.Update(remaining),
+                        Math.Min(SpeedForTurn(error, speed), remaining * 0.35));
                     if (stall.Stuck)
                     {
                         reason = "stalled";
                         break;
                     }
-                    bool tooFast = along > wanted * 1.2 + 0.3;
+                    bool tooFast = along > wanted * 1.1 + 0.15;
                     Wheels.Brakes(v, tooFast);
-                    float steer = pid.Steer(Geo.Delta(Heading(v), heading), along, Time.fixedDeltaTime);
-                    // In reverse the wheels turn the other way: the same correction of the front needs the
-                    // opposite command.
-                    Wheels.Hold(tooFast ? 0f : ThrottleFor(wanted, along, reverse), reverse ? -steer : steer);
+                    float steer = steering.Steer(error, along, Time.fixedDeltaTime);
+                    float throttle = speedHold.Throttle(wanted, along, Time.fixedDeltaTime, tooFast);
+                    Wheels.Hold(reverse ? -throttle : throttle, steer);
                     yield return new WaitForFixedUpdate();
                 }
                 if (trouble == null || watch.StillDriving())
@@ -357,12 +356,15 @@ namespace com.github.lhervier.ksp.mcpserver
             double lon = call.Number("longitude");
             double topSpeed = call.Number("speed", 2.0);
             double tolerance = call.Number("tolerance", 0.2);
-            double reachedWithin = Math.Max(HoldStraightWithin, tolerance);
+            double reachedWithin = Math.Max(ReachedWithin, tolerance);
 
             DriveWatch watch = new DriveWatch(v, topSpeed);
             float start = Time.time;
             bool reverse = false;
             bool decided = false;
+            double fromLat = 0.0, fromLon = 0.0;
+            RoverSteering steering = null;
+            SpeedHold speedHold = null;
             int turnRounds = 0;
             double maxSpeed = 0.0;
             StallBoost stall = new StallBoost();
@@ -387,17 +389,44 @@ namespace com.github.lhervier.ksp.mcpserver
                     double heading = Heading(v);
 
                     // Forward or reverse, chosen from where the target lies: at the start, and again whenever
-                    // the target falls behind.
+                    // the target falls behind. The rover then follows the line from where it chose to the
+                    // target.
                     if (!decided)
                     {
                         reverse = Math.Abs(Geo.Delta(heading, bearing)) > 90.0;
                         decided = true;
+                        fromLat = v.latitude;
+                        fromLon = v.longitude;
+                        steering = new RoverSteering(v, reverse);
+                        speedHold = new SpeedHold();
                     }
                     double travel = reverse ? Geo.Normalize(heading + 180.0) : heading;
-                    double error = Geo.Delta(travel, bearing);
 
-                    // Distance left along the direction of travel: negative once the target is behind.
-                    double remaining = distance * Math.Cos(error * Math.PI / 180.0);
+                    // The line, as a unit vector (north, east), and where the rover stands from it: how far the
+                    // target lies along it, and how far the rover is to its right.
+                    double on, oe;
+                    Geo.Offset(v, fromLat, fromLon, out on, out oe);
+                    double ln = n - on, le = e - oe;
+                    double length = Math.Sqrt(ln * ln + le * le);
+                    if (length < 1.0)
+                    {
+                        // Chosen within a metre of the target: the line is the bearing.
+                        ln = n;
+                        le = e;
+                        length = Math.Max(distance, 1e-6);
+                    }
+                    ln /= length;
+                    le /= length;
+                    double remaining = n * ln + e * le;
+                    double right = n * le - e * ln;
+
+                    // Aim at a point of the line ahead of the rover, further the faster it goes, beyond the target
+                    // if need be: the heading asked then turns smoothly however close the target is, where aiming
+                    // at the target itself swings it more and more.
+                    double lookAhead = Math.Max(4.0, 1.5 * Math.Abs(ForwardSpeed(v)));
+                    double aim = Math.Atan2(le, ln) * 180.0 / Math.PI - Math.Atan2(right, lookAhead) * 180.0 / Math.PI;
+                    double error = Geo.Delta(travel, aim);
+
                     if (remaining <= tolerance && distance <= reachedWithin)
                     {
                         reason = "arrived";
@@ -419,8 +448,8 @@ namespace com.github.lhervier.ksp.mcpserver
 
                     double along = reverse ? -ForwardSpeed(v) : ForwardSpeed(v);
                     maxSpeed = Math.Max(maxSpeed, along);
-                    float steer = distance > HoldStraightWithin ? SteerFor(error, reverse, Math.Abs(along)) : 0f;
-                    double wanted = Math.Max(0.15 + stall.Update(remaining), Math.Min(topSpeed, remaining * 0.3));
+                    double wanted = Math.Max(0.15 + stall.Update(remaining),
+                        Math.Min(SpeedForTurn(error, topSpeed), remaining * 0.3));
                     if (stall.Stuck)
                     {
                         reason = "stalled";
@@ -429,9 +458,11 @@ namespace com.github.lhervier.ksp.mcpserver
 
                     // Too fast for what is left: brake rather than only cut the throttle, the wheels alone
                     // roll on for metres.
-                    bool tooFast = along > wanted * 1.3 + 0.1;
+                    bool tooFast = along > wanted * 1.1 + 0.15;
                     Wheels.Brakes(v, tooFast);
-                    Wheels.Hold(tooFast ? 0f : ThrottleFor(wanted, along, reverse), steer);
+                    float steer = steering.Steer(error, along, Time.fixedDeltaTime);
+                    float throttle = speedHold.Throttle(wanted, along, Time.fixedDeltaTime, tooFast);
+                    Wheels.Hold(reverse ? -throttle : throttle, steer);
                     yield return new WaitForFixedUpdate();
                 }
                 if (trouble == null || watch.StillDriving())
