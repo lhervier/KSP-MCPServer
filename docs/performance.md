@@ -20,9 +20,10 @@ While nobody calls it, this mod does three things, all visible in [`Src/`](../Sr
 
 - **Once a frame, on the main thread**, the `Update()` of its `MonoBehaviour`
   ([`KSPMCPServerMod.cs`](../Src/KSPMCPServerMod.cs)) calls `Subscribe()`, which returns on a boolean
-  test once the game events are subscribed, then `MainThread.Pump()`
-  ([`MainThread.cs`](../Src/Server/MainThread.cs)), which takes a lock on the queue of pending tool calls and
-  returns when the queue is empty.
+  test once the game events are subscribed, then `Log.Flush()` ([`Log.cs`](../Src/Log.cs)), which takes a
+  lock on the queue of messages logged off the main thread and returns when it is empty, then
+  `MainThread.Pump()` ([`MainThread.cs`](../Src/Server/MainThread.cs)), which takes a lock on the queue of
+  pending tool calls and returns when the queue is empty.
 - **When two game events fire**, `onFloatingOriginShift` and `onFlightReady`, a handler counts the shifts
   of the floating origin or resets that count: a few assignments.
 - **On a thread of its own**, the HTTP listener ([`McpHttpServer.cs`](../Src/Server/McpHttpServer.cs)) waits

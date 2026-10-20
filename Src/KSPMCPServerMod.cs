@@ -15,6 +15,7 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private void Awake()
         {
+            Log.SetMainThread();
             DontDestroyOnLoad(gameObject);
             MainThread.SetHost(this);
 
@@ -48,12 +49,14 @@ namespace com.github.lhervier.ksp.mcpserver
         private void Update()
         {
             Subscribe();
+            Log.Flush();
             MainThread.Pump();
         }
 
         private void OnDestroy()
         {
             _server?.Stop();
+            Log.Flush();
             if (_subscribed)
             {
                 GameEvents.onFloatingOriginShift.Remove(OnOriginShift);

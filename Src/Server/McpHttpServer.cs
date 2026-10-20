@@ -76,18 +76,30 @@ namespace com.github.lhervier.ksp.mcpserver
             {
                 Handle(context);
             }
+            catch (IOException e)
+            {
+                // The client hung up before its answer was read or written: nothing went wrong on this side.
+                Log.Info("Client gone before its answer: " + e.Message.Replace("\r", "").Replace("\n", " "));
+                Close(context, 500);
+            }
             catch (Exception e)
             {
                 Log.Error("Request failed: " + e);
-                try
-                {
-                    context.Response.StatusCode = 500;
-                    context.Response.Close();
-                }
-                catch (Exception)
-                {
-                    // The client may already be gone.
-                }
+                Close(context, 500);
+            }
+        }
+
+        // Ends the answer with this status, if the client is still there to get it.
+        private static void Close(HttpListenerContext context, int status)
+        {
+            try
+            {
+                context.Response.StatusCode = status;
+                context.Response.Close();
+            }
+            catch (Exception)
+            {
+                // The client may already be gone.
             }
         }
 
