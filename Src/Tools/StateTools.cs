@@ -38,6 +38,13 @@ namespace com.github.lhervier.ksp.mcpserver
                     Schema.P("longitude", "number", "degrees", true),
                     Schema.P("spacing", "number", "metres from the point to the four points of the slope (default 5)")),
                 GetTerrain) { Concurrent = true };
+            yield return new Tool("list_rocs",
+                "Lists the surface features of Breaking Ground (ROCs) built near the active vessel, nearest first: " +
+                "their id, type and name, their distance from the active vessel in metres, the latitude, longitude " +
+                "and altitude of their pivot, the height of the terrain there and of the pivot above it, how many " +
+                "colliders they have and how many are on, and whether a part of the active vessel touches them.",
+                Schema.Object(Schema.P("radius", "number", "metres from the active vessel (default 300)")),
+                ListRocs) { Concurrent = true };
             yield return new Tool("wait",
                 "Waits a number of seconds of real time, letting the game run.",
                 Schema.Object(Schema.P("seconds", "number", "how long", true)),
@@ -132,6 +139,84 @@ namespace com.github.lhervier.ksp.mcpserver
                 { "roughness", Math.Max(Math.Max(north, south), Math.Max(east, west))
                     - Math.Min(Math.Min(north, south), Math.Min(east, west)) }
             });
+        }
+
+        private static IEnumerator ListRocs(ToolCall call)
+        {
+            if (!Require.FlightScene(call))
+            {
+                yield break;
+            }
+            Vessel active = FlightGlobals.ActiveVessel;
+            if (active == null)
+            {
+                call.Fail("No active vessel");
+                yield break;
+            }
+            double radius = call.Number("radius", 300.0);
+            CelestialBody body = active.mainBody;
+
+            // The colliders the active vessel's parts touch, to tell which ROC it stands on.
+            HashSet<Collider> touched = new HashSet<Collider>();
+            foreach (Part p in active.parts)
+            {
+                if (p.currentCollisions == null)
+                {
+                    continue;
+                }
+                for (int i = 0; i < p.currentCollisions.Count; i++)
+                {
+                    touched.Add(p.currentCollisions.KeyAt(i));
+                }
+            }
+
+            List<KeyValuePair<double, object>> found = new List<KeyValuePair<double, object>>();
+            foreach (ROC roc in UnityEngine.Object.FindObjectsOfType<ROC>())
+            {
+                Vector3d position = roc.transform.position;
+                double distance = Vector3d.Distance(position, active.CoMD);
+                if (distance > radius)
+                {
+                    continue;
+                }
+                double lat = body.GetLatitude(position);
+                double lon = body.GetLongitude(position);
+                double alt = body.GetAltitude(position);
+                double terrain = body.pqsController != null ? Lookup.TerrainHeight(body, lat, lon) : double.NaN;
+                Collider[] colliders = roc.GetComponentsInChildren<Collider>(true);
+                int on = 0;
+                bool touching = false;
+                foreach (Collider c in colliders)
+                {
+                    if (c.enabled && c.gameObject.activeInHierarchy)
+                    {
+                        on++;
+                    }
+                    touching |= touched.Contains(c);
+                }
+                found.Add(new KeyValuePair<double, object>(distance, new Dictionary<string, object>
+                {
+                    { "id", roc.rocID },
+                    { "type", roc.type },
+                    { "name", roc.displayName },
+                    { "distance", distance },
+                    { "latitude", lat },
+                    { "longitude", lon },
+                    { "altitude", alt },
+                    { "terrainHeight", terrain },
+                    { "heightFromTerrain", alt - terrain },
+                    { "colliders", colliders.Length },
+                    { "collidersOn", on },
+                    { "touching", touching }
+                }));
+            }
+            found.Sort((a, b) => a.Key.CompareTo(b.Key));
+            List<object> rocs = new List<object>();
+            foreach (KeyValuePair<double, object> entry in found)
+            {
+                rocs.Add(entry.Value);
+            }
+            call.Text(rocs);
         }
 
         private static IEnumerator Wait(ToolCall call)

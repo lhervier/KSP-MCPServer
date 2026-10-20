@@ -11,7 +11,7 @@ set of tools — but a ten-line Python script, or `curl`, can use it just as wel
 It was written to play measuring protocols that are too tedious, or too imprecise, to play by hand: one of
 them asks to park a rover on the same two spots again and again, before and after the game moves its
 world, and this mod parks it there to within a centimetre
-([Terrain Precision Fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/docs/checking-the-culprit-driving/the-runway-protocol.md)).
+([Terrain Precision Fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/docs/statics/checking/driving-protocol.md)).
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
@@ -28,7 +28,7 @@ it: one message at a time, each tool's replacing the last, and never on a screen
 
 The tools that act on the game run one at a time: while one runs, another is refused at once, with the
 name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
-`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `wait`, `screenshot`, `set_camera`,
+`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `wait`, `screenshot`, `set_camera`,
 `set_ui`, `set_pause`, `set_cheats`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
 and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
@@ -68,6 +68,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |
 | `set_position` | moves the active vessel to a point of a body, as *Set Position* of the `Alt+F12` menu does, in the attitude it had against its local horizon (or turned to a heading): holds it still a few metres up until the ground and what stands on it are built under it, lowers it to a given height above whatever lies under it, lets it go, and answers once it has settled; refuses a point where it would reach another vessel |
 | `get_terrain` | the terrain of a body at a point: its height, whether the sea covers it, its slope and roughness |
+| `list_rocs` | the surface features of Breaking Ground near the active vessel: id, type, distance, where their pivot lies and its height above the terrain, their colliders, whether the vessel touches them |
 | `set_orbit` | puts the active vessel on an orbit, as *Set Orbit* of the `Alt+F12` menu does |
 | `revert_to_launch` | reverts the flight to its launch, as *Revert to Launch* does |
 | `revert_to_editor` | reverts the flight to the Vehicle Assembly Building or the Space Plane Hangar, as *Revert to* does |
@@ -166,7 +167,7 @@ curl -X POST http://127.0.0.1:8770/mcp/ -H "Content-Type: application/json" \
 
 `{"method":"tools/list"}` lists the tools with the schema of their arguments. A complete example, a
 Python script with no dependency that plays a whole protocol, is
-[`run-driving-runway.py`](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/diag/automation/run-driving-runway.py)
+[`run-driving-runway.py`](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/diag/statics/automation/run-driving-runway.py)
 in Terrain Precision Fix.
 
 ## Adding tools from another mod
