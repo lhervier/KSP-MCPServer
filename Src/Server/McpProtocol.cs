@@ -12,7 +12,7 @@ namespace com.github.lhervier.ksp.mcpserver
     internal sealed class McpProtocol
     {
         public const string ServerName = "KSP-MCPServer";
-        private const string ServerVersion = "0.1.0";
+        private const string ServerVersion = "0.1.1";
         private const string DefaultProtocolVersion = "2025-06-18";
 
         private readonly Dictionary<string, Tool> _tools;
