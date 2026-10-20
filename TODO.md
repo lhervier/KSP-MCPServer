@@ -40,3 +40,28 @@ What is left to do on KSP-MCPServer, most urgent first.
   It now raises that speed after three seconds without progress; not yet seen on that lip.
 - **Publish**: create the GitHub repository (`lhervier/KSP-MCPServer`, the address the README and the mods that
   offer it tools link to), and a first release with the DLL.
+
+- **Let the agent drive a rover itself over rough ground** (Eve, the Mun with Parallax's rocks), choosing its
+  own path to a given spot, instead of `drive_to`'s straight line. Today `drive` and `drive_to` hold the call
+  until the rover stops, and see nothing ahead. Wanted:
+  - **Start and return at once**: a drive that starts and answers straight away, with an id; a call that changes
+    its heading and speed while it runs; `stop_drive` as today.
+  - **Follow the drive by polling** (simpler than server-sent events, whose notifications an MCP client does
+    not necessarily hand to the model): each poll answers the rover's state as a navball would tell it
+    (heading, pitch, roll, speed, vertical speed, wheels touching the ground, slip), the distance and bearing to
+    the target, the drive's state (driving, arrived, stalled, tipped over, stopped), the shape of the ground
+    ahead (a grid of heights and slopes in the rover's frame, a few tens of metres deep, from the collider
+    rather than the computed height, which differ between vertices), and the colliders ahead (scatter rocks,
+    statics: position, size, height above the ground), the way Diag Colliders finds them.
+  - **The server keeps the reflexes**: between two polls the agent is blind for several seconds, so the server
+    holds the heading and speed asked, and keeps today's guards (tip-over, runaway, stall, turns no harder
+    than keeps the rover on its wheels). A dead man's switch brakes when no poll or command comes for some
+    seconds. A turn-by-turn mode is worth trying: the game paused while the agent decides, then run for a
+    given time.
+  - **Poll only when something may happen**: the agent sets when it polls next from what the last poll told it,
+    so it does not read again and again a rover that just rolls on. Over flat ground with no collider in the
+    next 500 m, it drives on and polls again only once the rover is 500 m further. For that, a poll should say
+    how far the way ahead is clear (no slope above a limit, no collider), looking as far as the agent asks
+    rather than a few tens of metres; and the agent should be able to wait by distance rather than by time
+    ("answer when the rover has gone 500 m, or earlier if a guard fires or the drive ends"). The dead man's
+    switch then follows the delay the agent announces, not a fixed few seconds.
