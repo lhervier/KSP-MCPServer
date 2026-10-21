@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>Finds what the arguments of a tool name: a vessel, a body, a building; and reads the terrain.</summary>
     internal static class Lookup

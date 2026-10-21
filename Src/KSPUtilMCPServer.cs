@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Holds the MCP server for the whole session, across scene changes: listening from the start of KSP, or
     /// only once the player turns it on from its toolbar button; turned off the same way.
     /// </summary>
     [KSPAddon(KSPAddon.Startup.Instantly, true)]
-    public class KSPMCPServerMod : MonoBehaviour
+    public class KSPUtilMCPServer : MonoBehaviour
     {
         private const float SwitchMessageDuration = 4f;
 
@@ -84,13 +84,13 @@ namespace com.github.lhervier.ksp.mcpserver
             if (on)
             {
                 text = StartListening()
-                    ? "KSP-MCPServer on: listening on 127.0.0.1:" + _settings.Port
-                    : "KSP-MCPServer could not start: see KSP.log";
+                    ? "KSP-Util-MCPServer on: listening on 127.0.0.1:" + _settings.Port
+                    : "KSP-Util-MCPServer could not start: see KSP.log";
             }
             else
             {
                 StopListening();
-                text = "KSP-MCPServer off";
+                text = "KSP-Util-MCPServer off";
             }
             ScreenMessages.PostScreenMessage(text, SwitchMessageDuration, ScreenMessageStyle.UPPER_CENTER);
         }

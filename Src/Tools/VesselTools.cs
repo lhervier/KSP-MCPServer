@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Tools that choose the active vessel and its target, and move it as the Alt+F12 menu does: set it on

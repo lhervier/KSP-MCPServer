@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Steers a rover towards a heading: asks for a rate of turn that brings the heading round smoothly, never

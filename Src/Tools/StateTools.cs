@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>Tools that read the game without changing it, and the tool that lets it run.</summary>
     internal static class StateTools

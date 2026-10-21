@@ -1,6 +1,6 @@
 using System;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Marks a method of another mod that this server offers as a tool. A mod references this assembly

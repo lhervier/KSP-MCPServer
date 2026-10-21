@@ -4,7 +4,7 @@ using System.Net;
 using System.Text;
 using System.Threading;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// The MCP endpoint: JSON-RPC 2.0 over HTTP POST (the "streamable HTTP" transport, answering every

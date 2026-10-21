@@ -1,4 +1,4 @@
-# KSP-MCPServer
+# KSP-Util-MCPServer
 
 **⚠️ Work in progress.** The tools, their names and their arguments can still change.
 
@@ -11,7 +11,7 @@ set of tools — but a ten-line Python script, or `curl`, can use it just as wel
 It was written to play measuring protocols that are too tedious, or too imprecise, to play by hand: one of
 them asks to park a rover on the same two spots again and again, before and after the game moves its
 world, and this mod parks it there to within a centimetre
-([Terrain Precision Fix](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/docs/statics/checking/driving-protocol.md)).
+([Terrain Precision Fix](https://github.com/lhervier/KSP-Fix-TerrainPrecision/blob/main/docs/statics/checking/driving-protocol.md)).
 
 **How this was made.** Written with Claude, Anthropic's AI assistant, and reviewed by a human — me. I am
 saying so up front, because contributions made with an AI deserve a closer look than others, and because
@@ -102,10 +102,10 @@ Other mods can add their own tools, without depending on this one: see
 
 ## Install
 
-Copy `GameData/KSPMCPServer/` into the `GameData` folder of KSP. When KSP starts, its log reads
-`[KSP-MCPServer] Listening on http://127.0.0.1:8770/mcp/`.
+Copy `GameData/KSPUtilMCPServer/` into the `GameData` folder of KSP. When KSP starts, its log reads
+`[KSPUtilMCPServer] Listening on http://127.0.0.1:8770/mcp/`.
 
-Its settings are in `GameData/KSPMCPServer/PluginData/settings.cfg`, read when KSP starts:
+Its settings are in `GameData/KSPUtilMCPServer/PluginData/settings.cfg`, read when KSP starts:
 
 | setting | default | what it does |
 |---|---|---|
@@ -167,19 +167,19 @@ curl -X POST http://127.0.0.1:8770/mcp/ -H "Content-Type: application/json" \
 
 `{"method":"tools/list"}` lists the tools with the schema of their arguments. A complete example, a
 Python script with no dependency that plays a whole protocol, is
-[`run-driving-runway.py`](https://github.com/lhervier/KSP-TerrainPrecisionFix/blob/main/diag/statics/automation/run-driving-runway.py)
+[`run-driving-runway.py`](https://github.com/lhervier/KSP-Fix-TerrainPrecision/blob/main/diag/statics/automation/run-driving-runway.py)
 in Terrain Precision Fix.
 
 ## Adding tools from another mod
 
-A mod references `KSPMCPServer.dll` (without copying it: `<Private>false</Private>`) and puts
-`com.github.lhervier.ksp.mcpserver.McpToolAttribute` on the methods it offers. This server looks for that
+A mod references `KSPUtilMCPServer.dll` (without copying it: `<Private>false</Private>`) and puts
+`com.github.lhervier.ksp.util.mcpserver.McpToolAttribute` on the methods it offers. This server looks for that
 attribute when KSP starts, in every loaded assembly, and publishes each method as a tool. Nothing reads
 the attribute when this server is not installed, so the mod runs the same without it: the reference is
 only needed to compile.
 
 ```csharp
-using com.github.lhervier.ksp.mcpserver;
+using com.github.lhervier.ksp.util.mcpserver;
 
 internal static class McpTools
 {
@@ -212,7 +212,7 @@ without it.
 ## Build
 
 Clone this repository, set `KSPDIR` to your KSP install folder and run `build.bat`. It needs the .NET
-SDK, reads the KSP assemblies from your install, and puts the DLL in `GameData/KSPMCPServer/` inside the
+SDK, reads the KSP assemblies from your install, and puts the DLL in `GameData/KSPUtilMCPServer/` inside the
 repository. It does not install anything.
 
 ## License

@@ -1,4 +1,4 @@
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// The wheel throttle and steering held for the active vessel, given through its fly-by-wire the way a

@@ -62,7 +62,7 @@ def check_profiler():
     with urllib.request.urlopen(request, timeout=60) as response:
         names = {t["name"] for t in json.loads(response.read())["result"]["tools"]}
     if "profiler_start_capture" not in names:
-        raise SystemExit("error: install the fork of KSPProfiler that KSP-MCPServer can drive")
+        raise SystemExit("error: install the fork of KSPProfiler that KSP-Util-MCPServer can drive")
 
 
 def launch_time(path):
@@ -152,7 +152,7 @@ def main():
                         help="camera heading, degrees: in orbit, the camera's frame is the orbit's, and 204 looks "
                              "ahead with the ground on the left two thirds of the screen")
     parser.add_argument("--out", default="out", help="where run.json and profiler.csv go")
-    parser.add_argument("--port", type=int, default=8770, help="the port of KSP-MCPServer")
+    parser.add_argument("--port", type=int, default=8770, help="the port of KSP-Util-MCPServer")
     parser.add_argument("--keep-running", action="store_true", help="leave KSP running at the end")
     parser.add_argument("--window-title", default="Kerbal Space Program", help="the title of KSP's window")
     options = parser.parse_args()
@@ -163,7 +163,7 @@ def main():
     check_profiler()
     log("launch time", launched)
 
-    # KSP-MCPServer loads a save from the space centre or in flight only, as a player does: from the main
+    # KSP-Util-MCPServer loads a save from the space centre or in flight only, as a player does: from the main
     # menu, the game is opened at the space centre first.
     if call("get_state")["scene"] == "MAINMENU":
         call("open_game", folder=options.folder)

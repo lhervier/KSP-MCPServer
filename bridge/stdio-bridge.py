@@ -1,10 +1,10 @@
-"""Lets an MCP client that talks over stdio, such as Claude Code, keep using KSP-MCPServer while KSP stops and
+"""Lets an MCP client that talks over stdio, such as Claude Code, keep using KSP-Util-MCPServer while KSP stops and
 starts again.
 
     python stdio-bridge.py [--url <url>] [--ksp <name>=<KSP folder>]... [--cache <file>]
 
 The client starts this script and talks to it on its standard input and output; the script passes each message
-on to the server of KSP-MCPServer, over HTTP, and gives back its answer. It lives as long as the client does:
+on to the server of KSP-Util-MCPServer, over HTTP, and gives back its answer. It lives as long as the client does:
 
 - while KSP is not running, the tools of the game stay listed (the last list seen, kept in a file), and calling
   one answers that KSP is not running, instead of the connection going down;
@@ -38,7 +38,7 @@ EXECUTABLES = ["KSP_x64.exe", "KSP.x86_64", os.path.join("KSP.app", "Contents", 
 
 
 class Unreachable(Exception):
-    """The server of KSP-MCPServer does not answer: KSP is not running, or not far enough into its start."""
+    """The server of KSP-Util-MCPServer does not answer: KSP is not running, or not far enough into its start."""
 
 
 def log(text):
@@ -48,7 +48,7 @@ def log(text):
 
 
 class KspServer:
-    """The server of KSP-MCPServer, reached over HTTP."""
+    """The server of KSP-Util-MCPServer, reached over HTTP."""
 
     def __init__(self, url):
         self.url = url
@@ -198,7 +198,7 @@ class Bridge:
             if method == "initialize":
                 result = {"protocolVersion": params.get("protocolVersion", "2025-06-18"),
                           "capabilities": {"tools": {"listChanged": True}},
-                          "serverInfo": {"name": "KSP-MCPServer stdio bridge", "version": "0.1.0"}}
+                          "serverInfo": {"name": "KSP-Util-MCPServer stdio bridge", "version": "0.1.0"}}
             elif method == "ping":
                 result = {}
             elif method == "tools/list":
@@ -222,7 +222,7 @@ class Bridge:
                     "ksp_start starts KSP." % e)
             if message.get("method") == "tools/call":
                 if ksp_running():
-                    text = "The server of KSP-MCPServer does not answer (%s): KSP is running, but may be " \
+                    text = "The server of KSP-Util-MCPServer does not answer (%s): KSP is running, but may be " \
                            "still starting, stopping, or stuck." % e
                 return {"jsonrpc": "2.0", "id": message["id"],
                         "result": {"content": [{"type": "text", "text": text}], "isError": True}}
@@ -479,7 +479,7 @@ def main():
     if cache is None:
         base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".cache")
         port = urllib.parse.urlparse(options.url).port or 80
-        cache = os.path.join(base, "KSP-MCPServer", "bridge-tools-%d.json" % port)
+        cache = os.path.join(base, "KSP-Util-MCPServer", "bridge-tools-%d.json" % port)
 
     log("passing on to %s; KSP folders: %s" % (options.url, installs or "none"))
     Bridge(KspServer(options.url), installs, cache).run()

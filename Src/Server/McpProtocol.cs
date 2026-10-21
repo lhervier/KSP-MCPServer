@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// The MCP methods, over JSON-RPC 2.0: <c>initialize</c>, <c>ping</c>, <c>tools/list</c>,
@@ -11,7 +11,7 @@ namespace com.github.lhervier.ksp.mcpserver
     /// </summary>
     internal sealed class McpProtocol
     {
-        public const string ServerName = "KSP-MCPServer";
+        public const string ServerName = "KSP-Util-MCPServer";
         private const string ServerVersion = "0.1.1";
         private const string DefaultProtocolVersion = "2025-06-18";
 

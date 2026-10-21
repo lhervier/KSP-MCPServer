@@ -1,4 +1,4 @@
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// What a tool needs of the game before it acts. Each check returns whether it holds, after failing the

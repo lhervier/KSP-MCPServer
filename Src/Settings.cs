@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// The settings of the mod, read once from <c>PluginData/settings.cfg</c> next to the DLL; each one has

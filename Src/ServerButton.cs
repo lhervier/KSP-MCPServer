@@ -2,7 +2,7 @@ using System;
 using KSP.UI.Screens;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// The button of the server in the toolbar of KSP, in every scene that has the toolbar: pressed and green

@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <AssemblyName>KSPMCPServer</AssemblyName>
-    <RootNamespace>com.github.lhervier.ksp.mcpserver</RootNamespace>
+    <AssemblyName>KSPUtilMCPServer</AssemblyName>
+    <RootNamespace>com.github.lhervier.ksp.util.mcpserver</RootNamespace>
     <OutputType>Library</OutputType>
     <OutputPath>Output\bin</OutputPath>
     <IntermediateOutputPath>Output\obj</IntermediateOutputPath>

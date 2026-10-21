@@ -1,6 +1,6 @@
 # Performance
 
-Part of [KSP-MCPServer](../README.md). The short version is on the main page, under [Performance](../README.md#performance); here are the protocols and the figures.
+Part of [KSP-Util-MCPServer](../README.md). The short version is on the main page, under [Performance](../README.md#performance); here are the protocols and the figures.
 
 Two questions, one campaign each, both timed frame by frame with
 [KSPProfiler](https://github.com/KSPModdingLibs/KSPProfiler):
@@ -19,7 +19,7 @@ Two questions, one campaign each, both timed frame by frame with
 While nobody calls it, this mod does three things, all visible in [`Src/`](../Src):
 
 - **Once a frame, on the main thread**, the `Update()` of its `MonoBehaviour`
-  ([`KSPMCPServerMod.cs`](../Src/KSPMCPServerMod.cs)) calls `Subscribe()`, which returns on a boolean
+  ([`KSPUtilMCPServer.cs`](../Src/KSPUtilMCPServer.cs)) calls `Subscribe()`, which returns on a boolean
   test once the game events are subscribed, then `Log.Flush()` ([`Log.cs`](../Src/Log.cs)), which takes a
   lock on the queue of messages logged off the main thread and returns when it is empty, then
   `MainThread.Pump()` ([`MainThread.cs`](../Src/Server/MainThread.cs)), which takes a lock on the queue of

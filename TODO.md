@@ -1,6 +1,6 @@
 # TODO
 
-What is left to do on KSP-MCPServer, most urgent first.
+What is left to do on KSP-Util-MCPServer, most urgent first.
 
 - **Check `drive_to` on a tall rover over rough ground**, on the Earth of Real Solar System near Kourou,
   where a rover of 18 parts rolled over three times out of four drives (6 m/s once, 3 m/s twice). The control
@@ -49,7 +49,7 @@ What is left to do on KSP-MCPServer, most urgent first.
   (`onVesselWasModified`, `onPartCouple`, `onPartUndock`), keep one per configuration, or let the
   forgetting of the least squares correct it from a cautious start. Not checked: what happens to a
   `VesselModule` and its saved fields on docking and undocking.
-- **Publish**: create the GitHub repository (`lhervier/KSP-MCPServer`, the address the README and the mods that
+- **Publish**: create the GitHub repository (`lhervier/KSP-Util-MCPServer`, the address the README and the mods that
   offer it tools link to), and a first release with the DLL.
 
 - **Let the agent drive a rover itself over rough ground** (Eve, the Mun with Parallax's rocks), choosing its

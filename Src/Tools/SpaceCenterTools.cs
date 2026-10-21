@@ -4,7 +4,7 @@ using System.Reflection;
 using KSP.UI.Screens;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Tools that click the space centre: its buildings, their menus, the research of the tech tree, and what

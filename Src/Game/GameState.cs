@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// The state of the game as the tools answer it, and the shifts of the floating origin counted since the

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Writes to KSP.log with the mod's prefix. Callable from any thread: a message logged off Unity's main
@@ -10,7 +10,7 @@ namespace com.github.lhervier.ksp.mcpserver
     /// </summary>
     internal static class Log
     {
-        private const string Prefix = "[KSP-MCPServer] ";
+        private const string Prefix = "[KSPUtilMCPServer] ";
 
         // The messages logged off the main thread, waiting for Flush: true for an error.
         private static readonly Queue<KeyValuePair<bool, string>> Deferred = new Queue<KeyValuePair<bool, string>>();

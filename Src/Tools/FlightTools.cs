@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using KSP.UI.Screens;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>Tools that fly the active vessel as its pilot does: throttle, SAS, staging.</summary>
     internal static class FlightTools

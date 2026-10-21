@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace com.github.lhervier.ksp.mcpserver
+namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>Builds the JSON schemas of tool arguments.</summary>
     internal static class Schema

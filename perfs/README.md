@@ -50,7 +50,9 @@ Every frame count is under the profiler's 10 000 ceiling, so each capture ended 
 
 ### Telling the two configurations apart, installed and idle
 
-- The `Mod DLLs found` list of the log names `KSPMCPServer v0.0.0.0` in the `idle` logs only.
+*The log lines quoted on this page come from runs of an earlier version of this mod, when its log prefix was `[KSP-MCPServer]`; it is now `[KSPUtilMCPServer]`.*
+
+- The `Mod DLLs found` list of the log names `KSPUtilMCPServer v0.0.0.0` in the `idle` logs only.
 - This mod writes a single line in the `idle` logs, at startup:
   `[KSP-MCPServer] Listening on http://127.0.0.1:8770/mcp/ with 43 tools`, and nothing after it: no tool
   was called. The `without` logs hold no `[KSP-MCPServer]` line.
@@ -107,7 +109,7 @@ Every frame count is under the profiler's 10 000 ceiling, so each capture ended 
 
 **The profiler's CSV does not name the mods.** The `KSP.log` of the same run does:
 
-- its `Mod DLLs found` list names `KSPMCPServer v0.0.0.0` in the `server` logs only;
+- its `Mod DLLs found` list names `KSPUtilMCPServer v0.0.0.0` in the `server` logs only;
 - this mod's own lines appear in the `server` logs only: at startup, one
   `[KSP-MCPServer] Tool profiler_... from KSPProfiler` line for each of the fork's five tools, then
   `[KSP-MCPServer] Listening on http://127.0.0.1:8770/mcp/ with 35 tools`; at the end of the run,
