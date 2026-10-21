@@ -110,8 +110,16 @@ Its settings are in `GameData/KSPMCPServer/PluginData/settings.cfg`, read when K
 |---|---|---|
 | `port` | `8770` | the TCP port it listens on |
 | `screen_messages` | `true` | whether each tool shows its name at the top of the screen while it runs; `false` turns the messages off |
+| `listen_at_start` | `true` | whether it listens as soon as KSP starts; `false` keeps its port closed until it is turned on |
 
 It listens on `127.0.0.1` only: nothing outside the computer KSP runs on can reach it.
+
+**Turning it on and off.** Its button in the toolbar of KSP turns it on and off, in every scene that has
+the toolbar (not the main menu): a green dot while it listens, a struck-out grey ring while it does not. A
+message at the top of the screen tells which. Turned off, it closes its port and stops the tools still
+running, so that nothing drives the game any more. With `listen_at_start = false`, nothing can reach the game
+until the player turns the server on: in a game played for real, whoever plays decides when an assistant may
+drive it, for instance once the game is saved.
 
 ## Using it
 

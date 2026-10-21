@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace com.github.lhervier.ksp.mcpserver
@@ -11,7 +12,7 @@ namespace com.github.lhervier.ksp.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("get_state",
-                "Reads the game: scene, pause, universal time, time warp rate, and for the active vessel its id, " +
+                "Reads the game: the folder of the KSP that answers, scene, pause, universal time, time warp rate, and for the active vessel its id, " +
                 "name, situation, latitude, longitude, altitude, height above the terrain, surface speed, heading " +
                 "(degrees from north, towards east), pitch (degrees above the horizon, as the navball shows it), " +
                 "brakes, SAS, and the local time where it is (the fraction of " +
@@ -45,7 +46,9 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private static IEnumerator GetState(ToolCall call)
         {
-            call.Text(GameState.State());
+            Dictionary<string, object> state = GameState.State();
+            state["kspFolder"] = Path.GetFullPath(KSPUtil.ApplicationRootPath);
+            call.Text(state);
             yield break;
         }
 

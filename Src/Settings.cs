@@ -14,6 +14,9 @@ namespace com.github.lhervier.ksp.mcpserver
         /// <summary>Whether each tool shows its name at the top of the screen while it runs.</summary>
         public readonly bool ScreenMessages = true;
 
+        /// <summary>Whether the server listens as soon as KSP starts, rather than once the player turns it on.</summary>
+        public readonly bool ListenAtStart = true;
+
         private Settings(ConfigNode node)
         {
             if (node == null)
@@ -29,6 +32,11 @@ namespace com.github.lhervier.ksp.mcpserver
             if (bool.TryParse(node.GetValue("screen_messages"), out screenMessages))
             {
                 ScreenMessages = screenMessages;
+            }
+            bool listenAtStart;
+            if (bool.TryParse(node.GetValue("listen_at_start"), out listenAtStart))
+            {
+                ListenAtStart = listenAtStart;
             }
         }
 

@@ -19,6 +19,9 @@ namespace com.github.lhervier.ksp.mcpserver
         private readonly int _port;
         private Thread _thread;
         private volatile bool _running;
+        // The requests being answered, and whether the listener was closed (1) or not (0).
+        private int _inFlight;
+        private int _closed;
 
         public McpHttpServer(int port, McpProtocol protocol)
         {
@@ -37,12 +40,31 @@ namespace com.github.lhervier.ksp.mcpserver
             Log.Info("Listening on http://127.0.0.1:" + _port + "/mcp/ with " + _protocol.ToolCount + " tools");
         }
 
+        /// <summary>
+        /// Stops serving: the requests coming in from now on are refused, those already taken still get their
+        /// answer, and the port closes once they have it.
+        /// </summary>
         public void Stop()
         {
             _running = false;
+            // Mono's listener drops the answers still being written when it stops: the last request to end
+            // closes it, unless none is running now.
+            Thread.MemoryBarrier();
+            if (Interlocked.CompareExchange(ref _inFlight, 0, 0) == 0)
+            {
+                CloseListener();
+            }
+        }
+
+        // Closes the port, once.
+        private void CloseListener()
+        {
+            if (Interlocked.Exchange(ref _closed, 1) == 1)
+            {
+                return;
+            }
             try
             {
-                _listener.Stop();
                 _listener.Close();
             }
             catch (Exception)
@@ -53,7 +75,7 @@ namespace com.github.lhervier.ksp.mcpserver
 
         private void Loop()
         {
-            while (_running)
+            while (true)
             {
                 HttpListenerContext context;
                 try
@@ -62,15 +84,32 @@ namespace com.github.lhervier.ksp.mcpserver
                 }
                 catch (Exception)
                 {
-                    // Stop() makes GetContext throw: that is how the loop ends.
+                    // Closing the listener makes GetContext throw: that is how the loop ends.
                     return;
                 }
                 new Thread(() => Serve(context)) { IsBackground = true, Name = McpProtocol.ServerName + " request" }.Start();
             }
         }
 
-        // Answers one request, a server error when anything goes wrong.
+        // Answers one request, counted among those being answered.
         private void Serve(HttpListenerContext context)
+        {
+            Interlocked.Increment(ref _inFlight);
+            try
+            {
+                Answer(context);
+            }
+            finally
+            {
+                if (Interlocked.Decrement(ref _inFlight) == 0 && !_running)
+                {
+                    CloseListener();
+                }
+            }
+        }
+
+        // Answers one request, a server error when anything goes wrong.
+        private void Answer(HttpListenerContext context)
         {
             try
             {
@@ -120,6 +159,13 @@ namespace com.github.lhervier.ksp.mcpserver
             using (StreamReader reader = new StreamReader(request.InputStream, Encoding.UTF8))
             {
                 body = reader.ReadToEnd();
+            }
+            if (!_running)
+            {
+                // Turned off while the request came in: it must not reach the game any more.
+                response.StatusCode = 503;
+                response.Close();
+                return;
             }
             int status;
             object answer = _protocol.Handle(body, out status);

@@ -295,8 +295,9 @@ class Bridge:
         """Returns this bridge's tools, by name: their description, the schema of their arguments, and what
         runs them."""
         tools = {"ksp_status": (
-            "Tells whether KSP is running, whether its server answers, and in which scene the game is; also the "
-            "KSP folders ksp_start can start. Works while KSP is not running.",
+            "Tells whether KSP is running, whether its server answers, the folder of the KSP that answers and "
+            "which of this bridge's installs it is (none for another KSP), and in which scene the game is; also "
+            "the KSP folders ksp_start can start. Works while KSP is not running.",
             schema(), self.status)}
         if not self.installs:
             return tools
@@ -321,7 +322,8 @@ class Bridge:
             self.start)
         tools["ksp_quit"] = (
             "Quits KSP and waits until its process has ended; log copies its KSP.log, which the next start "
-            "overwrites. Quitting from a flight saves the active vessel in the game's persistent save.",
+            "overwrites. Quitting from a flight saves the active vessel in the game's persistent save. Refused "
+            "for a KSP that does not run from one of the folders this bridge was given.",
             schema({"install": {"type": "string", "enum": names,
                                 "description": "the KSP folder whose KSP.log to copy (default: the one ksp_start "
                                                "started)"},
@@ -343,17 +345,29 @@ class Bridge:
         return {"content": [{"type": "text", "text": text}], "isError": error}
 
     def status(self, arguments):
-        state = {"ksp_running": ksp_running(), "server": "down", "scene": None, "installs": self.installs,
-                 "started_by_bridge": self.started}
+        state = {"ksp_running": ksp_running(), "server": "down", "scene": None, "ksp_folder": None,
+                 "install": None, "installs": self.installs, "started_by_bridge": self.started}
         try:
             self.server.tools()
             state["server"] = "up"
-            state["scene"] = self.server.call("get_state", timeout=PROBE_TIMEOUT).get("scene")
+            game = self.server.call("get_state", timeout=PROBE_TIMEOUT)
+            state["scene"] = game.get("scene")
+            state["ksp_folder"] = game.get("kspFolder")
+            state["install"] = self.install_of(state["ksp_folder"])
         except Unreachable:
             pass
         except Exception as e:
             state["scene"] = "unknown (%s)" % e
         return state
+
+    def install_of(self, folder):
+        """Returns the name of the install of this bridge that folder is, or None when it is none of them."""
+        if not folder:
+            return None
+        for name, path in self.installs.items():
+            if same_folder(path, folder):
+                return name
+        return None
 
     def folder(self, arguments, name):
         install = arguments.get(name)
@@ -403,6 +417,15 @@ class Bridge:
             install, folder = self.folder(arguments if arguments.get("install") else {"install": self.started},
                                           "install")
         if ksp_running():
+            # Only a KSP of the folders this bridge was given, as for ksp_start: the player's own game is theirs
+            # to quit.
+            try:
+                running = self.server.call("get_state", timeout=PROBE_TIMEOUT).get("kspFolder")
+            except (Unreachable, RuntimeError) as e:
+                raise RuntimeError("could not ask KSP which folder it runs from: %s" % e)
+            if self.install_of(running) is None:
+                raise RuntimeError("the KSP that runs is not one of this bridge's folders (%s): not quitting it"
+                                   % (running or "an older server, which does not tell its folder"))
             try:
                 self.server.call("quit_game", timeout=30)
             except (Unreachable, RuntimeError) as e:
@@ -420,6 +443,12 @@ class Bridge:
             copy(os.path.join(folder, "KSP.log"), arguments["log"])
             text += "; KSP.log copied to " + os.path.abspath(arguments["log"])
         return text
+
+
+def same_folder(a, b):
+    """Tells whether two paths name the same folder, whatever their case or trailing separator."""
+    return os.path.normcase(os.path.normpath(os.path.abspath(a))) == \
+        os.path.normcase(os.path.normpath(os.path.abspath(b)))
 
 
 def copy(source, destination):
