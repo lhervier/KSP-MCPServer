@@ -62,17 +62,37 @@ What is left to do on KSP-Util-MCPServer, most urgent first.
     (heading, pitch, roll, speed, vertical speed, wheels touching the ground, slip), the distance and bearing to
     the target, the drive's state (driving, arrived, stalled, tipped over, stopped), the shape of the ground
     ahead (a grid of heights and slopes in the rover's frame, a few tens of metres deep, from the collider
-    rather than the computed height, which differ between vertices), and the colliders ahead (scatter rocks,
-    statics: position, size, height above the ground), the way Diag Colliders finds them.
+    rather than the computed height, which differ between vertices), and the obstacles ahead (position, size,
+    height above the ground).
+  - **Parallax's rocks cannot be found by their colliders**: Parallax only creates a rock's collider once a
+    vessel is on it. `CollisionManager` activates the colliders within the vessel's own size, plus a lookahead
+    along its velocity (`colliderLookaheadTime` × speed, at most 125 m), and that lookahead is 0 in the
+    `ParallaxGlobalSettings.cfg` of 1.0.6. Seen on the Mun with Diag Colliders (2026-10-21): rocks all
+    around a still rover, not one collider. So the way Diag Colliders finds obstacles only works for statics
+    (`PQSCity`, `PQSCity2`); the rocks have to come from Parallax's own instance data, as Bulldozer's preview
+    reads it (`ScatterHighlighter`): `CollisionManager.collisionData`, per loaded quad, the local position,
+    rotation and scale of every collideable instance, posed as `quad.localToWorldMatrix × TRS(localPos,
+    RotationFromUp(local normal) × AngleAxis(rotation, up), localScale)` since Parallax 1.0.5. Without a hard
+    dependency on Parallax (the server must load without it): reflection, or a tool offered by a small
+    companion mod built against Parallax, as the Diags offer theirs.
+    What this data cannot tell, and the poll must say so rather than call the way clear:
+    - only the quads Parallax has populated, around the vessel and the camera: beyond, nothing is known
+      (how far that reaches is not measured yet);
+    - only the collideable families (`collisionLevel` of each scatter against the global one, 2 by default):
+      the smaller rocks are not in it, and the rover drives over them;
+    - an instance is often a **cluster**, one mesh whose pivot is the anchor and whose boulders spread 15-25 m
+      around it: an obstacle is the footprint of its mesh bounds, posed as above, never the anchor alone.
   - **The server keeps the reflexes**: between two polls the agent is blind for several seconds, so the server
     holds the heading and speed asked, and keeps today's guards (tip-over, runaway, stall, turns no harder
     than keeps the rover on its wheels). A dead man's switch brakes when no poll or command comes for some
     seconds. A turn-by-turn mode is worth trying: the game paused while the agent decides, then run for a
     given time.
   - **Poll only when something may happen**: the agent sets when it polls next from what the last poll told it,
-    so it does not read again and again a rover that just rolls on. Over flat ground with no collider in the
+    so it does not read again and again a rover that just rolls on. Over flat ground with no obstacle in the
     next 500 m, it drives on and polls again only once the rover is 500 m further. For that, a poll should say
-    how far the way ahead is clear (no slope above a limit, no collider), looking as far as the agent asks
-    rather than a few tens of metres; and the agent should be able to wait by distance rather than by time
+    how far the way ahead is clear (no slope above a limit, no obstacle), looking as far as the agent asks
+    rather than a few tens of metres, **and how far it could see**: with Parallax, no further than the quads
+    it has populated, so on rocky ground the polls come as often as that range demands, whatever the agent
+    asked; and the agent should be able to wait by distance rather than by time
     ("answer when the rover has gone 500 m, or earlier if a guard fires or the drive ends"). The dead man's
     switch then follows the delay the agent announces, not a fixed few seconds.
