@@ -28,7 +28,7 @@ it: one message at a time, each tool's replacing the last, and never on a screen
 
 The tools that act on the game run one at a time: while one runs, another is refused at once, with the
 name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
-`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `wait`, `screenshot`, `set_camera`,
+`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `list_parts`, `read_part_menus`, `wait`, `screenshot`, `set_camera`,
 `set_ui`, `set_pause`, `set_cheats`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
 and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
@@ -82,6 +82,10 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
+| `list_parts` | the parts of the active vessel: the id the part tools take, name, title, resources, whether its part action window is open and pinned |
+| `part_menu` | opens a part's action window as a right click on it does (the windows not pinned close), pins or unpins it, drags it to a point of the screen by its title bar, or closes every window not pinned as a right click on empty space does |
+| `read_part_menus` | the open part action windows, where they are on screen and what they show: buttons, fields, resources, and the resource transfer controls with their buttons, state and links to the other parts' |
+| `press_part_button` | presses a button of a part's action window, by its label, or the In, Out or Stop button of a resource transfer |
 | `drive` | drives a rover along a heading, forward or backing away with its front facing it, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
 | `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, along the straight line from where it starts, and stops there with the brakes on, still; stops and turns round when the target falls behind |
 
