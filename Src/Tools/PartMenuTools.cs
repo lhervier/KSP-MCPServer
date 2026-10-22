@@ -42,19 +42,22 @@ namespace com.github.lhervier.ksp.util.mcpserver
             yield return new Tool("read_part_menus",
                 "Reads the open part action windows: for each, the part's id and title, whether it is pinned, where " +
                 "it is on screen (x, y of its top left corner and its size, in pixels from the top left corner of the " +
-                "game's window), and the items it shows: buttons (their label), fields (their label), resources " +
+                "game's window), and the items it shows: buttons (their label and the name of their event), fields " +
+                "(their label), resources " +
                 "(amount and capacity), and " +
                 "the resource transfer controls: which of their In, Out and Stop buttons show, their state (None, " +
                 "In, Out) and how many controls of other parts they are linked with.",
                 Schema.Object(), ReadPartMenus) { Concurrent = true };
             yield return new Tool("press_part_button",
                 "Presses a button of a part's open part action window, as a click does, then reads the windows as " +
-                "read_part_menus does: a button by its label, or the In, Out or Stop button of a resource's transfer " +
+                "read_part_menus does: a button by its label or by the name of its event (the same in every language " +
+                "of the game), or the In, Out or Stop button of a resource's transfer " +
                 "control. Refuses a button the window does not show, and any input lock that makes the game ignore " +
                 "the click but the one KSP sets when its window loses the focus.",
                 Schema.Object(
                     Schema.P("part", "number", "the part's id, as list_parts gives it", true),
-                    Schema.P("button", "string", "the label of a button, as read_part_menus gives it (case ignored)"),
+                    Schema.P("button", "string",
+                        "the label of a button, or the name of its event, as read_part_menus gives them (case ignored)"),
                     Schema.P("resource", "string", "the resource of a transfer control, by name (LiquidFuel, Oxidizer...)"),
                     Schema.P("transfer", "string", "in, out or stop: the transfer control's button to press")),
                 PressPartButton);
@@ -180,11 +183,40 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 yield break;
             }
+            // The lock the game sets whenever its window loses the focus is lifted for the click, as set_target
+            // ignores it: the player's click would have given the focus back. While it holds, the windows do
+            // not even show the buttons that need control of the vessel: they get two frames to build them.
+            bool focusLocked = InputLockManager.lockStack.ContainsKey(FocusLock);
+            if (focusLocked)
+            {
+                InputLockManager.RemoveControlLock(FocusLock);
+                yield return null;
+                yield return null;
+            }
+            string failure = Press(call, part);
+            if (focusLocked)
+            {
+                InputLockManager.SetControlLock(FocusLock);
+            }
+            if (failure != null)
+            {
+                call.Fail(failure);
+                yield break;
+            }
+            yield return null;
+            call.Text(Menus());
+        }
+
+        /// <summary>
+        /// Clicks the button the call names in the open window of a part. Returns null once clicked, or why it
+        /// could not be: no open window, no such button shown, or an input lock that makes the game ignore it.
+        /// </summary>
+        private static string Press(ToolCall call, Part part)
+        {
             UIPartActionWindow window = OpenWindow(part);
             if (window == null)
             {
-                call.Fail("The part action window of " + part.partInfo.title + " is not open");
-                yield break;
+                return "The part action window of " + part.partInfo.title + " is not open";
             }
             Button button;
             string what;
@@ -203,8 +235,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 }
                 if (control == null)
                 {
-                    call.Fail("The window of " + part.partInfo.title + " shows no transfer control for " + resource);
-                    yield break;
+                    return "The window of " + part.partInfo.title + " shows no transfer control for " + resource;
                 }
                 string transfer = call.String("transfer").ToLowerInvariant();
                 if (transfer == "in")
@@ -221,8 +252,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 }
                 else
                 {
-                    call.Fail("Unknown transfer button " + call.String("transfer") + ": in, out or stop");
-                    yield break;
+                    return "Unknown transfer button " + call.String("transfer") + ": in, out or stop";
                 }
                 what = transfer + " of " + resource;
             }
@@ -234,7 +264,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 {
                     UIPartActionButton b = item as UIPartActionButton;
                     if (b != null && b.gameObject.activeInHierarchy && b.Evt != null
-                        && string.Equals(b.Evt.guiName, label, StringComparison.OrdinalIgnoreCase))
+                        && (string.Equals(b.Evt.guiName, label, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(b.Evt.name, label, StringComparison.OrdinalIgnoreCase)))
                     {
                         button = b.button;
                         break;
@@ -242,47 +273,27 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 }
                 if (button == null)
                 {
-                    call.Fail("The window of " + part.partInfo.title + " shows no button " + label);
-                    yield break;
+                    return "The window of " + part.partInfo.title + " shows no button " + label;
                 }
                 what = label;
             }
             else
             {
-                call.Fail("Give a button, or a resource and a transfer button");
-                yield break;
+                return "Give a button, or a resource and a transfer button";
             }
             // A click reaches onClick only on a button that shows and is interactable (Button.Press).
             if (!button.gameObject.activeInHierarchy || !button.IsInteractable())
             {
-                call.Fail("The button " + what + " does not show in the window of " + part.partInfo.title);
-                yield break;
+                return "The button " + what + " does not show in the window of " + part.partInfo.title;
             }
-            // The window's buttons ignore a click while the tweakables are locked. The lock the game sets
-            // whenever its window loses the focus is lifted for the click, as set_target ignores it: the
-            // player's click would have given the focus back. Any other lock fails the call.
-            bool focusLocked = InputLockManager.lockStack.ContainsKey(FocusLock);
-            if (focusLocked)
-            {
-                InputLockManager.RemoveControlLock(FocusLock);
-            }
+            // The window's buttons ignore a click while the tweakables are locked.
             if (!InputLockManager.IsUnlocked(ControlTypes.TWEAKABLES_ANYCONTROL))
             {
-                string locks = string.Join(", ", new List<string>(InputLockManager.lockStack.Keys).ToArray());
-                if (focusLocked)
-                {
-                    InputLockManager.SetControlLock(FocusLock);
-                }
-                call.Fail("The game ignores the buttons of part action windows now: input locked by " + locks);
-                yield break;
+                return "The game ignores the buttons of part action windows now: input locked by " +
+                    string.Join(", ", new List<string>(InputLockManager.lockStack.Keys).ToArray());
             }
             button.onClick.Invoke();
-            if (focusLocked)
-            {
-                InputLockManager.SetControlLock(FocusLock);
-            }
-            yield return null;
-            call.Text(Menus());
+            return null;
         }
 
         /// <summary>
@@ -458,7 +469,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 return new Dictionary<string, object>
                 {
                     { "kind", "button" },
-                    { "label", button.Evt != null ? button.Evt.guiName : null }
+                    { "label", button.Evt != null ? button.Evt.guiName : null },
+                    { "event", button.Evt != null ? button.Evt.name : null }
                 };
             }
             UIPartActionFieldItem field = item as UIPartActionFieldItem;
