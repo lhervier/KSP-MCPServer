@@ -59,6 +59,8 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
+| `mouse_move` | moves the mouse pointer to a point of the game's window, as a mouse does, in any scene, with or without the focus, the Windows session locked or not; answers with the pointer as Unity reads it and the interface objects under it, each with the object a click on it reaches |
+| `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers |
 | `set_time` | sets the universal time of the game: the time of day at a spot |
 | `set_warp` | sets the time warp, on rails or in physics warp, as the `.` and `,` keys do, with Alt or without |
 | `warp_to` | warps to a universal time, as *Warp To* of a manoeuvre node or of the map view does |
@@ -100,6 +102,17 @@ active vessel changes or when the flight ends.
 | `call_method` | calls a method of a loaded object of any mod, or a static one, with or without arguments |
 
 These three take the first loaded object of the type, or with `match` (`path=value`) the first one whose path reads that value.
+
+`mouse_move` and `mouse_click` take `x` and `y` in pixels of the game's window, counted from the top left
+corner of its client area (frame and title bar left out): `x` to the right, `y` down. Unity's
+`Input.mousePosition` counts `y` up from the bottom edge instead: a point at `x`, `y` reads `x`,
+`height - 1 - y` there, and both tools give it back as `mousePosition`, with the window's size. A point out of
+the window is refused. Their answer names the object the interface has the pointer over (`pointerEnter`) and
+lists the objects under it, the topmost first, each with its path and the object a click on it reaches
+(`clickHandler`): in the map view, `mouse_move` to the top edge, above the arrow that unfolds the vessel
+filters, tells which object a click there would reach. Windows only. They work as a real mouse does: the game
+reads them through its own input, without the focus, and also while the Windows session is locked, when
+no real mouse reaches it. The cursor of Windows moves with them, since the game reads its position from it.
 
 Other mods can add their own tools, without depending on this one: see
 [Adding tools from another mod](#adding-tools-from-another-mod).
