@@ -44,6 +44,58 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "of mods that do not follow it stay.",
                 Schema.Object(Schema.P("visible", "boolean", "true to show it, false to hide it", true)),
                 SetUi) { Concurrent = true };
+            yield return new Tool("map_view",
+                "Enters or leaves the map view of a flight, as the M key does, and answers once the game shows " +
+                "the view asked for. Refuses when the game would not take the key: the map toggle locked, or the " +
+                "map view not allowed in this game.",
+                Schema.Object(Schema.P("enabled", "boolean", "true to enter the map view, false to leave it", true)),
+                MapViewTool);
+        }
+
+        /// <summary>How long the game may take to switch to or from the map view, in seconds of real time.</summary>
+        private const float MapViewSeconds = 10f;
+
+        private static IEnumerator MapViewTool(ToolCall call)
+        {
+            if (!HighLogic.LoadedSceneIsFlight || MapView.fetch == null)
+            {
+                call.Fail("No map view: not in flight");
+                yield break;
+            }
+            bool enabled = call.Bool("enabled");
+            if (MapView.MapIsEnabled != enabled)
+            {
+                // The checks the M key goes through, in MapView.Update: a locked toggle, or a game whose map
+                // view is off, ignores the key.
+                if (!InputLockManager.IsUnlocked(ControlTypes.MAP_TOGGLE))
+                {
+                    call.Fail("The map toggle is locked: the M key would do nothing now");
+                    yield break;
+                }
+                if (enabled && !HighLogic.CurrentGame.Parameters.Flight.CanUseMap)
+                {
+                    call.Fail("This game does not allow the map view");
+                    yield break;
+                }
+                if (enabled)
+                {
+                    MapView.EnterMapView();
+                }
+                else
+                {
+                    MapView.ExitMapView();
+                }
+                yield return Waits.Until(call, () => MapView.MapIsEnabled == enabled, MapViewSeconds,
+                    "The game did not " + (enabled ? "enter" : "leave") + " the map view");
+                if (call.IsError)
+                {
+                    yield break;
+                }
+            }
+            // The interface of the view follows a frame later.
+            yield return null;
+            yield return null;
+            call.Text(new Dictionary<string, object> { { "enabled", MapView.MapIsEnabled } });
         }
 
         private static IEnumerator Screenshot(ToolCall call)
