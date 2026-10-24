@@ -34,6 +34,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
             tools.AddRange(TimeTools.All());
             tools.AddRange(ViewTools.All());
             tools.AddRange(MouseTools.All());
+            tools.AddRange(StationTools.All());
             tools.AddRange(FlightTools.All());
             tools.AddRange(PartMenuTools.All());
             tools.AddRange(DriveTools.All());

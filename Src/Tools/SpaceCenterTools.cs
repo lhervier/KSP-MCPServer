@@ -58,7 +58,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "(its button pressed when it has a single one, such as the guide's of a new career; otherwise " +
                 "closed as Escape does), then the flight results shown after a crash, then, at the space centre, " +
                 "the menu of a building (as a click beside it " +
-                "does), the recovery report, then the screen of a building. Answers with what it closed: closed " +
+                "does), the recovery report (there or in the tracking station), then the screen of a building. " +
+                "Answers with what it closed: closed " +
                 "is nothing when nothing was open.",
                 Schema.Object(
                     Schema.P("dialogs_only", "boolean",
@@ -314,7 +315,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             Dictionary<string, object> answer = new Dictionary<string, object> { { "closed", "nothing" } };
             bool atSpaceCentre = HighLogic.LoadedScene == GameScenes.SPACECENTER;
             PopupDialog[] dialogs = Object.FindObjectsOfType<PopupDialog>();
-            MissionRecoveryDialog report = atSpaceCentre ? Object.FindObjectOfType<MissionRecoveryDialog>() : null;
+            // The recovery report shows at the space centre, and in the tracking station after its Recover button.
+            MissionRecoveryDialog report = atSpaceCentre || HighLogic.LoadedScene == GameScenes.TRACKSTATION
+                ? Object.FindObjectOfType<MissionRecoveryDialog>()
+                : null;
             UISpaceCenter ui = atSpaceCentre ? UISpaceCenter.Instance : null;
             KSCFacilityContextMenu menu = atSpaceCentre ? Object.FindObjectOfType<KSCFacilityContextMenu>() : null;
             bool dialogsOnly = call.Bool("dialogs_only");
@@ -410,7 +414,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
         }
 
         /// <summary>Adds to <paramref name="buttons"/> the buttons of a dialog element and of all it holds.</summary>
-        private static void CollectButtons(DialogGUIBase element, List<DialogGUIButton> buttons)
+        internal static void CollectButtons(DialogGUIBase element, List<DialogGUIButton> buttons)
         {
             if (element == null)
             {

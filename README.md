@@ -61,7 +61,9 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
 | `map_view` | enters or leaves the map view of a flight, as the M key does, and answers once the game shows it; refuses when the game would ignore the key |
 | `mouse_move` | moves the mouse pointer to a point of the game's window, as a mouse does, in any scene, with or without the focus, the Windows session locked or not; answers with the pointer as Unity reads it and the interface objects under it, each with the object a click on it reaches |
-| `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers |
+| `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers; or double-clicks, two clicks in a row as a player's |
+| `read_tracking_station` | the tracking station as the player sees it: each row of its list from the top, with its vessel, whether it looks selected, where it lies on screen, and whether it lies within the visible part of the scrolled list; when another mod hides the station's list and shows its own rows instead, those rows (toggles of a toggle group labelled with a tracked vessel's name), `listReplaced`, and the station's own rows, hidden, with whether each is lit; the vessel selected; whether *Fly*, *Recover*, *Terminate* and *Track* show and respond, and where; points as `mouse_click` takes them |
+| `read_dialogs` | the dialogs open over the scene: name, title, message, and their buttons with their label, whether each responds, and the middle of each on screen, as `mouse_click` takes it |
 | `set_time` | sets the universal time of the game: the time of day at a spot |
 | `set_warp` | sets the time warp, on rails or in physics warp, as the `.` and `,` keys do, with Alt or without |
 | `warp_to` | warps to a universal time, as *Warp To* of a manoeuvre node or of the map view does |
@@ -80,7 +82,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `fly_vessel` | flies a vessel of the player's from the tracking station, as its *Fly* button does |
 | `open_facility` | clicks a building of the space centre: its editor, its scene or its screen opens |
 | `facility_menu` | opens a building's menu at the space centre, as a right click does, and reads it: level, damage, costs, funds; presses its *Upgrade* or *Repair* button and waits until KSP is done |
-| `close_screen` | closes what is open over the scene, as its own button does: a dialog, the flight results after a crash, a building's menu, the recovery report, a building's screen |
+| `close_screen` | closes what is open over the scene, as its own button does: a dialog, the flight results after a crash, a building's menu, the recovery report (at the space centre or in the tracking station), a building's screen |
 | `quit_game` | quits KSP, a second after answering |
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |

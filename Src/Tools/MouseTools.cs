@@ -58,11 +58,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
             yield return new Tool("mouse_click",
                 "Clicks at x, y as a mouse does: moves the pointer there as mouse_move does, then presses and releases " +
                 "the button, and answers once the game has seen both, with the pointer's position as Unity reads it " +
-                "and the interface objects under it. x and y as mouse_move takes them. The pointer stays there.",
+                "and the interface objects under it. x and y as mouse_move takes them. The pointer stays there. With " +
+                "count 2, a double click: a second click right after the first, as a player's double click.",
                 Schema.Object(
                     Schema.P("x", "number", "pixels from the left edge of the game's window", true),
                     Schema.P("y", "number", "pixels from the top edge of the game's window", true),
-                    Schema.P("button", "string", "left or right (default left)")),
+                    Schema.P("button", "string", "left or right (default left)"),
+                    Schema.P("count", "number", "1 for a click, 2 for a double click (default 1)")),
                 MouseClick);
         }
 
@@ -99,25 +101,35 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 yield break;
             }
 
-            // The button goes down, then up once the game has seen it down for a frame: a press as short as a
-            // player's, which every handler of the game sees, whether it acts on the press or on the release.
-            Post(target, button.Down, (IntPtr)button.Flag);
-            yield return Waits.Until(call, () => Input.GetMouseButton(button.Index), ButtonSeconds,
-                "The game did not see the button go down");
-            if (call.IsError)
+            int count = (int)call.Number("count", 1);
+            if (count != 1 && count != 2)
             {
+                call.Fail("count: 1 for a click, 2 for a double click");
                 yield break;
             }
-            yield return null;
-            Post(target, button.Up, IntPtr.Zero);
-            yield return Waits.Until(call, () => !Input.GetMouseButton(button.Index), ButtonSeconds,
-                "The game did not see the button go up");
-            if (call.IsError)
+            for (int i = 0; i < count; i++)
             {
-                yield break;
+                // The button goes down, then up once the game has seen it down for a frame: a press as short as a
+                // player's, which every handler of the game sees, whether it acts on the press or on the release.
+                Post(target, button.Down, (IntPtr)button.Flag);
+                yield return Waits.Until(call, () => Input.GetMouseButton(button.Index), ButtonSeconds,
+                    "The game did not see the button go down");
+                if (call.IsError)
+                {
+                    yield break;
+                }
+                yield return null;
+                Post(target, button.Up, IntPtr.Zero);
+                yield return Waits.Until(call, () => !Input.GetMouseButton(button.Index), ButtonSeconds,
+                    "The game did not see the button go up");
+                if (call.IsError)
+                {
+                    yield break;
+                }
+                // One more frame for the event system to send the click; the second click of a double click
+                // follows at once, well within the time the game allows between the two.
+                yield return null;
             }
-            // One more frame for the event system to send the click.
-            yield return null;
             call.Text(Report(target, call.String("button", "left").ToLowerInvariant()));
         }
 
