@@ -50,6 +50,82 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "map view not allowed in this game.",
                 Schema.Object(Schema.P("enabled", "boolean", "true to enter the map view, false to leave it", true)),
                 MapViewTool);
+            yield return new Tool("iva_view",
+                "Enters the IVA view of the active vessel, or leaves it for the flight view, as the C key does, " +
+                "and answers once the game shows the view asked for. Refuses when the game would not take the " +
+                "key: camera modes locked, the game paused, IVA not allowed in this game, or no crew member to " +
+                "look through.",
+                Schema.Object(Schema.P("enabled", "boolean", "true to enter the IVA view, false to go back to the flight view", true)),
+                IvaViewTool);
+        }
+
+        /// <summary>How long the game may take to switch to or from the IVA view, in seconds of real time.</summary>
+        private const float IvaViewSeconds = 10f;
+
+        private static IEnumerator IvaViewTool(ToolCall call)
+        {
+            CameraManager cameras = CameraManager.Instance;
+            if (!HighLogic.LoadedSceneIsFlight || cameras == null)
+            {
+                call.Fail("No IVA view: not in flight");
+                yield break;
+            }
+            bool enabled = call.Bool("enabled");
+            bool inIva = cameras.currentCameraMode == CameraManager.CameraMode.IVA;
+            if (inIva != enabled)
+            {
+                // The checks the C key goes through, in CameraManager.Update and NextCameraMode.
+                if (!InputLockManager.IsUnlocked(ControlTypes.CAMERAMODES))
+                {
+                    call.Fail("Camera modes are locked: the C key would do nothing now");
+                    yield break;
+                }
+                if (FlightDriver.Pause)
+                {
+                    call.Fail("The game is paused: the C key would do nothing now");
+                    yield break;
+                }
+                CameraManager.CameraMode from = cameras.currentCameraMode;
+                if (enabled)
+                {
+                    if (from != CameraManager.CameraMode.Flight && from != CameraManager.CameraMode.Internal)
+                    {
+                        call.Fail("The C key goes to the IVA view from the flight view only, not from " + from);
+                        yield break;
+                    }
+                    if (!HighLogic.CurrentGame.Parameters.Flight.CanIVA)
+                    {
+                        call.Fail("This game does not allow the IVA view");
+                        yield break;
+                    }
+                    if (!cameras.SetCameraIVA())
+                    {
+                        // As NextCameraMode does when no kerbal can take the view.
+                        cameras.SetCameraFlight();
+                        call.Fail("The active vessel has no crew member to look through");
+                        yield break;
+                    }
+                }
+                else
+                {
+                    cameras.SetCameraFlight();
+                }
+                CameraManager.CameraMode wanted = enabled ? CameraManager.CameraMode.IVA : CameraManager.CameraMode.Flight;
+                yield return Waits.Until(call, () => cameras.currentCameraMode == wanted, IvaViewSeconds,
+                    "The game did not " + (enabled ? "enter" : "leave") + " the IVA view");
+                if (call.IsError)
+                {
+                    yield break;
+                }
+            }
+            // The interface of the view follows a frame later.
+            yield return null;
+            yield return null;
+            call.Text(new Dictionary<string, object>
+            {
+                { "enabled", cameras.currentCameraMode == CameraManager.CameraMode.IVA },
+                { "cameraMode", cameras.currentCameraMode.ToString() }
+            });
         }
 
         /// <summary>How long the game may take to switch to or from the map view, in seconds of real time.</summary>

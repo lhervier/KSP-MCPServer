@@ -43,7 +43,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, SAS, the local time where it is and the length of its body's day |
+| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, lights, gear, SAS, the local time where it is and the length of its body's day |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game's `persistent` save from any scene, the main menu included, as *Resume Game* does: always at the space centre, written back as `persistent`; returns once the buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -60,6 +60,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
 | `map_view` | enters or leaves the map view of a flight, as the M key does, and answers once the game shows it; refuses when the game would ignore the key |
+| `iva_view` | enters the IVA view of the active vessel or leaves it for the flight view, as the C key does, and answers once the game shows it; refuses when the game would ignore the key, and when the vessel has no crew to look through |
 | `mouse_move` | moves the mouse pointer to a point of the game's window, as a mouse does, in any scene, with or without the focus, the Windows session locked or not; answers with the pointer as Unity reads it and the interface objects under it, each with the object a click on it reaches |
 | `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers; or double-clicks, two clicks in a row as a player's |
 | `read_tracking_station` | the tracking station as the player sees it: each row of its list from the top, with its vessel, whether it looks selected, where it lies on screen, and whether it lies within the visible part of the scrolled list; when another mod hides the station's list and shows its own rows instead, those rows (toggles of a toggle group labelled with a tracked vessel's name), `listReplaced`, and the station's own rows, hidden, with whether each is lit; the vessel selected; whether *Fly*, *Recover*, *Terminate* and *Track* show and respond, and where; points as `mouse_click` takes them |

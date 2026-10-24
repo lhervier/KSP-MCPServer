@@ -51,6 +51,13 @@ What is left to do on KSP-Util-MCPServer, most urgent first.
   `VesselModule` and its saved fields on docking and undocking.
 - **Publish**: create the GitHub repository (`lhervier/KSP-Util-MCPServer`, the address the README and the mods that
   offer it tools link to), and a first release with the DLL.
+- **Make the server work on Linux**: never run there yet. What is known to depend on Windows: `mouse_click`
+  and `mouse_move` post their messages to the game's window through `user32.dll` (`MouseTools`), which does
+  not exist on Linux; the bridge only places the window of KSP (`window_x`) on Windows (`kspwindow.py`), and
+  only finds a running KSP by `pgrep` elsewhere; the build is a `build.bat` that reads the assemblies of
+  the game from `KSP_x64_Data`, where the Linux build of KSP has `KSP_Data`. To do: a way to click without
+  `user32` (through Unity's event system, or X11), placing the window under X11 or Wayland, a build script
+  for Linux, then a full session on a Linux install of KSP to find what else breaks.
 
 - **Let the agent drive a rover itself over rough ground** (Eve, the Mun with Parallax's rocks), choosing its
   own path to a given spot, instead of `drive_to`'s straight line. Today `drive` and `drive_to` hold the call

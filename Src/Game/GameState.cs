@@ -62,6 +62,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "heading", Geo.Heading(v) },
                     { "pitch", Geo.Pitch(v) },
                     { "brakes", v.ActionGroups[KSPActionGroup.Brakes] },
+                    { "lights", v.ActionGroups[KSPActionGroup.Light] },
+                    { "gear", v.ActionGroups[KSPActionGroup.Gear] },
                     { "sas", v.ActionGroups[KSPActionGroup.SAS] }
                 };
                 // As the day and night switches of the space centre read it, which turn its lights on before
